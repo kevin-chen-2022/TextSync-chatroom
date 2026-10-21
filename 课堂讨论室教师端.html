@@ -146,6 +146,7 @@
   }
   #notice-input:focus { border-color: var(--warn); }
   .ne-col { display: flex; flex-direction: column; gap: 6px; }
+  .ne-wrap { flex: 1; position: relative; display: flex; }
   .ne-btn {
     padding: 8px 14px; border-radius: 9px; font-size: 14px; font-weight: 700;
     background: var(--warn); color: #fff;
@@ -262,7 +263,40 @@
   .type-btn.on-a { border-color: #10b981; color: #15803d; background: #f0fdf4; }
   .type-btn.mini { color: #9ca3af; border-style: dashed; }
   .char-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
-  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .input-row { display: flex; gap: 8px; align-items: flex-end; position: relative; }
+  /* 富文本：表情/颜色按钮与浮层 */
+  .icon-btn {
+    flex: none; width: 38px; height: 46px; border-radius: 12px;
+    background: var(--bg); font-size: 19px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:active { background: var(--pink-soft); }
+  .icon-btn .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); background: #fff; }
+  .icon-btn.on-color .dot { border-color: var(--pink); }
+  .composer-pop {
+    display: none; position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 70;
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 10px;
+  }
+  .composer-pop.show { display: block; }
+  .pop-hint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .emoji-grid { display: grid; grid-template-columns: repeat(8, 32px); gap: 4px; }
+  .emoji-item { width: 32px; height: 32px; font-size: 19px; border-radius: 8px; background: none; }
+  .emoji-item:active { background: var(--pink-soft); }
+  .sw-row { display: flex; gap: 8px; align-items: center; }
+  .sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+  .sw.def { background: #fff; }
+  .sw:active { transform: scale(1.12); }
+  /* 图片气泡 */
+  .img-bubble {
+    background: #fff; border: 1px solid var(--line); border-radius: 4px 14px 14px 14px;
+    padding: 6px; max-width: min(280px, 100%);
+  }
+  .msg.mine .img-bubble { background: var(--pink-soft); border-color: var(--pink-border); border-radius: 14px 4px 14px 14px; }
+  .msg.is-t .img-bubble { background: #fdf2f8; border-color: var(--pink-border); }
+  .img-bubble img { display: block; max-width: 100%; max-height: 260px; border-radius: 10px; cursor: zoom-in; }
+  .img-cap { font-size: var(--msg-size); line-height: 1.5; padding: 6px 4px 2px; white-space: pre-wrap; word-break: break-word; }
+  .img-up { font-size: 14px; padding: 4px 2px; }
   #msg-input {
     flex: 1; resize: none; border: 2px solid var(--line); border-radius: 12px;
     padding: 10px 12px; font-size: 16px; line-height: 1.5;
@@ -388,7 +422,13 @@
 
   <!-- 教师公告编辑条 -->
   <div id="notice-edit">
-    <textarea id="notice-input" maxlength="200" placeholder="输入公告内容（最多 200 字），发布后全班置顶；撤下请点右侧按钮"></textarea>
+    <button class="icon-btn" id="btn-notice-emoji" type="button" title="插入表情">😊</button>
+    <button class="icon-btn" id="btn-notice-color" type="button" title="公告文字颜色"><span class="dot"></span></button>
+    <div class="ne-wrap">
+      <textarea id="notice-input" maxlength="200" placeholder="输入公告内容（最多 200 字），发布后全班置顶；撤下请点右侧按钮"></textarea>
+      <div class="composer-pop" id="n-pop-emoji"><div class="emoji-grid" id="n-emoji-grid"></div></div>
+      <div class="composer-pop" id="n-pop-color"><div class="pop-hint">公告的文字颜色</div><div class="sw-row" id="n-swatch-row"></div></div>
+    </div>
     <div class="ne-col">
       <button class="ne-btn" id="btn-notice-send" type="button">发布公告</button>
       <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
@@ -413,10 +453,14 @@
       <span class="char-count"><span id="char-num">0</span>/300</span>
     </div>
     <div class="input-row">
-      <button id="btn-file" type="button" title="发送文件（最大 80MB）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+      <button class="icon-btn" id="btn-emoji" type="button" title="插入表情">😊</button>
+      <button class="icon-btn" id="btn-color" type="button" title="消息文字颜色"><span class="dot"></span></button>
+      <button id="btn-file" type="button" title="发送文件 / 图片（图片限 10MB，大图自动压缩）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
       <textarea id="msg-input" maxlength="300" placeholder="想好再发，点击「发送」或按 Ctrl+Enter"></textarea>
       <button id="btn-send" type="button">发 送</button>
       <input type="file" id="file-in" hidden>
+      <div class="composer-pop" id="pop-emoji"><div class="emoji-grid" id="emoji-grid"></div></div>
+      <div class="composer-pop" id="pop-color"><div class="pop-hint">整条消息的文字颜色</div><div class="sw-row" id="swatch-row"></div></div>
     </div>
   </div>
 
@@ -471,6 +515,8 @@
      \u200bA\u200b 开头 = 教师公告（置顶，不进消息流）
      \u200bQ\u200b 开头 = 提问（橙色左边线 + 「问」标签）
      \u200bH\u200b 开头 = 回答（绿色左边线 + 「答」标签）
+     \u200bC#rrggbb\u200b 开头 = 消息/公告颜色前缀（渲染时染字色后剥除）
+     \u200bIMG\u200buid\u200benc文件名\u200b正文 = 图片消息（不进文件列表，仅消息广播）
    ===================================================================== */
 
 /* ---------- 常量与全局状态 ---------- */
@@ -482,6 +528,8 @@ var TEACHER_KEY = "1234";          // 教师口令（防误入，防不了有心
 var MARK_A = "\u200bA\u200b";      // 公告标记
 var MARK_Q = "\u200bQ\u200b";      // 提问标记
 var MARK_H = "\u200bH\u200b";      // 回答标记
+var MARK_IMG = "\u200bIMG\u200b";  // 图片消息标记（\u200bIMG\u200buid\u200benc文件名\u200b正文）
+var IMG_MAX = 10 * 1024 * 1024;    // 图片上限（超限提示压缩后再发）
 var TEACHER_MARK = "\u2005";       // 教师名字前缀：四分之一空格（不可见，用于识别）
 var MAX_KEEP = 300;                // 本地最多保留的历史消息条数
 var SEND_GAP = 2000;               // 发送节流（毫秒）
@@ -497,6 +545,8 @@ var S = {
   replayedTo: {},                   // 公告重发记录（每次进房重置）
   fileReplayedTo: {},               // 文件列表重发记录
   msgType: "normal",                // normal | question | answer
+  msgColor: "",                     // 输入区当前文字颜色（"" = 默认）
+  noticeColor: "",                  // 当前公告颜色（"" = 默认）
   fontSize: 18,
   lastSend: 0,
   onlyQ: false,
@@ -554,9 +604,51 @@ function setType(t) {
     t === "answer"   ? "输入你的回答，全班都能看到" :
     "想好再发，点击「发送」或按 Ctrl+Enter";
 }
+
+/* ---------- 富文本辅助（表情面板 / 颜色面板） ---------- */
+var EMOJIS = ["👍","❤️","😂","🎉","🤔","👏","🙏","🔥","✅","❌","❓","💡","⚠️","😊","😅","🥰","😭","🤝","🙋","🌟","⚡","🎯","💯","📚"];
+var SWATCHES = ["", "#e11d48", "#f97316", "#16a34a", "#2563eb", "#9333ea", "#64748b"];
+function buildEmojiGrid(el, onPick) {
+  if (!el) return;
+  for (var i = 0; i < EMOJIS.length; i++) {
+    (function (em) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "emoji-item"; b.textContent = em;
+      b.onclick = function () { onPick(em); };
+      el.appendChild(b);
+    })(EMOJIS[i]);
+  }
+}
+function buildSwatches(el, onPick) {
+  if (!el) return;
+  for (var i = 0; i < SWATCHES.length; i++) {
+    (function (c) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "sw" + (c ? "" : " def");
+      if (c) b.style.background = c;
+      b.title = c ? ("文字颜色 " + c) : "默认颜色";
+      b.onclick = function () { onPick(c); };
+      el.appendChild(b);
+    })(SWATCHES[i]);
+  }
+}
+function insertAtCursor(inp, t) {
+  var st = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+  var en = inp.selectionEnd == null ? st : inp.selectionEnd;
+  inp.value = inp.value.slice(0, st) + t + inp.value.slice(en);
+  var pos = st + t.length;
+  inp.setSelectionRange(pos, pos);
+}
+function setDot(btn, c) {
+  if (!btn) return;
+  if (c) { btn.style.background = c; btn.classList.add("on-color"); }
+  else { btn.style.background = ""; btn.classList.remove("on-color"); }
+}
 function isTeacherName(n) { return typeof n === "string" && n.indexOf(TEACHER_MARK) === 0; }
 function displayName(n) { return isTeacherName(n) ? n.slice(1) : n; }
-function stripMark(t) { return t.replace(/\u200b[QAH]\u200b/g, ""); }
+function stripMark(t) {
+  return t.replace(/\u200b[QAH]\u200b/g, "").replace(/\u200bC#[0-9a-fA-F]{6}\u200b/g, "");
+}
 function rand16() {
   var s = "abcdefghijklmnopqrstuvwxyz0123456789", r = "";
   for (var i = 0; i < 16; i++) r += s.charAt(Math.floor(Math.random() * s.length));
@@ -601,7 +693,7 @@ function loadHistory() {
     var raw = localStorage.getItem("cr_msg_" + S.room);
     if (raw) S.msgs = JSON.parse(raw) || [];
     for (var i = 0; i < S.msgs.length; i++) {
-      if (S.msgs[i].type === "file") S.msgs[i].uploading = false; // 上传中途退出的残留状态
+      if (S.msgs[i].type === "file" || S.msgs[i].type === "image") S.msgs[i].uploading = false; // 上传中途退出的残留状态
     }
     var n = localStorage.getItem("cr_notice_" + S.room);
     if (n) S.notice = n;
@@ -691,20 +783,37 @@ function handleServerMsg(m) {
     var name = m.data.name || "匿名";
     var time = m.data.time || Date.now();
 
-    /* 教师公告 */
+    /* 教师公告（可携带 \u200bC#rrggbb\u200b 颜色前缀） */
     if (raw.indexOf(MARK_A) === 0) {
       if (!isTeacherName(name)) return;         // 非教师发的公告标记直接丢弃
-      var fresh = stripMark(raw.slice(MARK_A.length));
-      var changed = fresh !== S.notice;
+      var nc = "";
+      var t2 = raw.slice(MARK_A.length).replace(/\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { nc = c; return ""; });
+      var fresh = stripMark(t2);
+      var changed = fresh !== S.notice || nc !== (S.noticeColor || "");
       S.notice = fresh;
+      S.noticeColor = nc;
       renderNotice(changed);                    // 内容相同（如教师重发）不重复弹提示
       return;
     }
-    /* 普通消息 / 提问 / 回答 */
-    var type = raw.indexOf(MARK_Q) === 0 ? "question" : (raw.indexOf(MARK_H) === 0 ? "answer" : "normal");
-    var text = stripMark(raw);
+    /* 普通消息 / 提问 / 回答 / 图片（均可携带颜色前缀） */
+    var color = "";
+    var raw2 = raw.replace(/\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { color = c; return ""; });
+    if (raw2.indexOf(MARK_IMG) === 0) {
+      /* 图片消息：\u200bIMG\u200buid\u200benc文件名\u200b正文 */
+      var pp = raw2.split("\u200b");
+      var iuid = (pp[2] || "").toLowerCase();
+      if (!/^[a-z0-9]{16}$/.test(iuid)) return; // uid 白名单，杜绝注入
+      var icap = stripMark(pp.slice(4).join("\u200b"));
+      pushMsg({
+        name: name, text: icap, time: time, type: "image", color: color,
+        file: { id: "i" + time, name: decodeURIComponent(pp[3] || "图片.jpg"), size: 0, uid: iuid }
+      });
+      return;
+    }
+    var type = raw2.indexOf(MARK_Q) === 0 ? "question" : (raw2.indexOf(MARK_H) === 0 ? "answer" : "normal");
+    var text = stripMark(raw2);
     if (!text.trim()) return;
-    pushMsg({ name: name, text: text, time: time, type: type });
+    pushMsg({ name: name, text: text, time: time, type: type, color: color });
   } else if (m.type === "addFile") {
     var f = m.data;
     if (f && f.id && f.name) pushMsg(fileToMsg(f));
@@ -774,7 +883,7 @@ function maybeReplayFiles(name) {
 function removeFileCard(id) {
   delete S.fileCache[id];
   for (var i = 0; i < S.msgs.length; i++) {
-    if (S.msgs[i].type === "file" && S.msgs[i].file && S.msgs[i].file.id === id) {
+    if ((S.msgs[i].type === "file" || S.msgs[i].type === "image") && S.msgs[i].file && S.msgs[i].file.id === id) {
       S.msgs.splice(i, 1);
       saveHistory();
       break;
@@ -815,14 +924,16 @@ function renderMsg(msg) {
   div.className = "msg" + (isT ? " is-t" : "") +
                   (mine ? " mine" : "") + (msg.type === "question" ? " is-q" : "") +
                   (msg.type === "answer" ? " is-a" : "");
-  if (msg.type === "file") div.setAttribute("data-fid", msg.file.id);
+  if ((msg.type === "file" || msg.type === "image") && msg.file) div.setAttribute("data-fid", msg.file.id);
   var initial = displayName(msg.name).slice(0, 1) || "?";
   var icoSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
   var body;
   if (msg.type === "file") {
     body = fileCardHtml(msg.file, msg.uploading, icoSvg);
+  } else if (msg.type === "image") {
+    body = imageBubbleHtml(msg);
   } else {
-    body = '<div class="bubble">' + esc(msg.text) + "</div>";
+    body = '<div class="bubble"' + (msg.color ? ' style="color:' + msg.color + '"' : "") + ">" + esc(msg.text) + "</div>";
   }
   var html =
     '<div class="avatar">' + esc(initial) + "</div>" +
@@ -835,7 +946,7 @@ function renderMsg(msg) {
         "<span>" + hhmm(msg.time) + "</span>" +
       "</div>" + body +
     "</div>" +
-    (msg.type === "file" ? "" :
+    (msg.type === "file" || msg.type === "image" ? "" :
       '<span class="msg-acts">' +
         '<button class="pin-btn" type="button">上屏</button>' +
         '<button class="copy-btn" type="button">复制</button>' +
@@ -864,7 +975,7 @@ function renderMsg(msg) {
   }
   /* 点击消息气泡切换显示操作按钮（触屏无 hover） */
   div.addEventListener("click", function () {
-    if (!S.isTeacher || msg.type === "file") return;
+    if (!S.isTeacher || msg.type === "file" || msg.type === "image") return;
     var on = div.classList.contains("acts-on");
     var olds = list.querySelectorAll(".msg.acts-on");
     for (var k = 0; k < olds.length; k++) olds[k].classList.remove("acts-on");
@@ -896,6 +1007,27 @@ function fileCardHtml(f, uploading, icoSvg) {
       (S.isTeacher ? '<button class="fdel" type="button">撤下</button>' : "");
   }
   return '<div class="file-card"><div class="file-ico">' + icoSvg + "</div>" + inner + "</div>";
+}
+/* 图片气泡 HTML（uploading=true 显示进度条；下载链接直指文件服务） */
+function imageBubbleHtml(msg) {
+  if (msg.uploading) {
+    return (
+      '<div class="img-bubble">' +
+        '<div class="img-up">🖼 ' + esc(msg.file.name) + " 上传中…</div>" +
+        '<div class="file-sub" data-role="pct">0%</div>' +
+        '<div class="fprog"><em data-role="bar"></em></div>' +
+      "</div>"
+    );
+  }
+  var url = FILE_DL + msg.file.uid + "/" + encodeURIComponent(msg.file.name);
+  return (
+    '<div class="img-bubble">' +
+      '<a href="' + url + '" target="_blank" rel="noopener">' +
+        '<img src="' + url + '" alt="' + esc(msg.file.name) + '" loading="lazy">' +
+      "</a>" +
+      (msg.text ? '<div class="img-cap">' + esc(msg.text) + "</div>" : "") +
+    "</div>"
+  );
 }
 function addSysMsg(text) {
   var list = $("msg-list");
@@ -948,6 +1080,8 @@ function renderNotice(alsoToast) {
   if (S.isTeacher) {
     var ta = $("notice-input");
     if (document.activeElement !== ta) ta.value = S.notice; // 正在输入时不覆盖
+    ta.style.color = S.noticeColor || "";
+    setDot($("btn-notice-color"), S.noticeColor || "");
     if (alsoToast) toast(S.notice ? "收到新公告" : "公告已被撤下");
     return;
   }
@@ -1075,6 +1209,47 @@ function bindRoom() {
     }).catch(function () { toast("读取剪贴板失败，请用 Ctrl+V"); });
   };
 
+  /* 表情 / 颜色浮层（对话输入 + 公告编辑共用一套构建函数） */
+  buildEmojiGrid($("emoji-grid"), function (em) {
+    insertAtCursor(input, em);
+    $("char-num").textContent = input.value.length;
+    input.focus();
+  });
+  buildSwatches($("swatch-row"), function (c) {
+    S.msgColor = c;
+    setDot($("btn-color"), c);
+    input.style.color = c || "";
+    $("pop-color").classList.remove("show");
+  });
+  var nInput = $("notice-input");
+  buildEmojiGrid($("n-emoji-grid"), function (em) { insertAtCursor(nInput, em); nInput.focus(); });
+  buildSwatches($("n-swatch-row"), function (c) {
+    S.noticeColor = c;
+    setDot($("btn-notice-color"), c);
+    nInput.style.color = c || "";
+    $("n-pop-color").classList.remove("show");
+  });
+  function togglePop(btn, popId) {
+    btn.onclick = function (e) {
+      e.stopPropagation();
+      var p = $(popId);
+      var open = p.classList.contains("show");
+      var all = document.querySelectorAll(".composer-pop.show");
+      for (var i = 0; i < all.length; i++) all[i].classList.remove("show");
+      if (!open) p.classList.add("show");
+    };
+  }
+  togglePop($("btn-emoji"), "pop-emoji");
+  togglePop($("btn-color"), "pop-color");
+  togglePop($("btn-notice-emoji"), "n-pop-emoji");
+  togglePop($("btn-notice-color"), "n-pop-color");
+  /* 点击面板/按钮以外区域收起浮层 */
+  document.addEventListener("click", function (e) {
+    if (e.target.closest && (e.target.closest(".composer-pop") || e.target.closest(".icon-btn"))) return;
+    var ps = document.querySelectorAll(".composer-pop.show");
+    for (var i = 0; i < ps.length; i++) ps[i].classList.remove("show");
+  });
+
   input.addEventListener("input", function () { $("char-num").textContent = input.value.length; });
   input.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); sendMsg(); }
@@ -1084,7 +1259,9 @@ function bindRoom() {
   /* 文件发送 */
   $("btn-file").onclick = function () { $("file-in").click(); };
   $("file-in").onchange = function () {
-    if (this.files && this.files[0]) sendFile(this.files[0]);
+    var f0 = this.files && this.files[0];
+    if (f0 && f0.type && f0.type.indexOf("image/") === 0) sendImage(f0);
+    else if (f0) sendFile(f0);
     this.value = "";
   };
   /* 教师撤下文件（事件委托，卡片重渲染后依然有效） */
@@ -1114,7 +1291,8 @@ function bindRoom() {
   $("btn-notice-send").onclick = function () {
     var t = $("notice-input").value.trim();
     if (!t) { toast("公告内容不能为空"); return; }
-    if (safeSend({ type: "message", data: { message: MARK_A + t, time: Date.now() } })) {
+    var npre = S.noticeColor ? ("\u200bC#" + S.noticeColor + "\u200b") : "";
+    if (safeSend({ type: "message", data: { message: MARK_A + npre + t, time: Date.now() } })) {
       S.notice = t;
       renderNotice(false);
       toast("公告已发布");
@@ -1124,6 +1302,9 @@ function bindRoom() {
     if (!S.notice) { toast("当前没有公告"); return; }
     if (safeSend({ type: "message", data: { message: MARK_A, time: Date.now() } })) {
       S.notice = "";
+      S.noticeColor = "";
+      $("notice-input").style.color = "";
+      setDot($("btn-notice-color"), "");
       renderNotice(false);
       toast("公告已撤下");
     }
@@ -1142,6 +1323,7 @@ function bindRoom() {
       var m = S.msgs[i];
       var head = "[" + new Date(m.time).toLocaleTimeString() + "] " + displayName(m.name) + " ";
       if (m.type === "file") lines.push(head + "[文件]：" + m.file.name + "（" + fmtSize(m.file.size) + "）");
+      else if (m.type === "image") lines.push(head + "[图片]：" + m.file.name);
       else {
         var tag = m.type === "question" ? "[提问]" : (m.type === "answer" ? "[回答]" : (isTeacherName(m.name) ? "[教师]" : ""));
         lines.push(head + tag + "：" + m.text);
@@ -1223,12 +1405,15 @@ function sendMsg() {
   }
   var payload = S.msgType === "question" ? (MARK_Q + text) : (S.msgType === "answer" ? (MARK_H + text) : text);
   payload = applyFilter(payload);
-  if (!payload.replace(MARK_Q, "").replace(MARK_H, "").trim()) { toast("内容已被敏感词全部过滤"); return; }
-  if (!safeSend({ type: "message", data: { message: payload, time: now } })) return;
+  if (!payload.replace(MARK_Q, "").replace(MARK_H, "").replace(/\u200bC#[0-9a-fA-F]{6}\u200b/g, "").trim()) {
+    toast("内容已被敏感词全部过滤"); return;
+  }
+  var pre = S.msgColor ? ("\u200bC#" + S.msgColor + "\u200b") : "";
+  if (!safeSend({ type: "message", data: { message: pre + payload, time: now } })) return;
   S.lastSend = now;
   /* 本机立即回显（服务器不会把消息发回给发送者本人） */
   pushMsg({
-    name: S.name, text: text, time: now,
+    name: S.name, text: text, time: now, color: S.msgColor,
     type: S.msgType === "question" ? "question" : (S.msgType === "answer" ? "answer" : "normal")
   });
   input.value = "";
@@ -1279,6 +1464,81 @@ function sendFile(file) {
   xhr.onerror = function () { removeFileCard(id); toast("上传失败，请检查网络"); };
   xhr.ontimeout = function () { removeFileCard(id); toast("上传超时"); };
   xhr.send(file);
+}
+
+/* ---------- 图片消息（全员可发；不进文件列表，只以消息形式广播） ---------- */
+function sendImage(file) {
+  if (!file) return;
+  if (file.size > IMG_MAX) { toast("图片超过 10MB，请压缩后再发"); return; }
+  if (!S.ws || S.ws.readyState !== 1) { toast("尚未连上服务器，稍候再试"); return; }
+  if (/^image\/(jpeg|png)$/.test(file.type) && file.size > 2 * 1024 * 1024) {
+    compressImage(file, 1600, 0.85, function (blob, fname) { go(blob || file, fname || file.name); });
+  } else {
+    go(file, file.name);
+  }
+  function go(blob, fname) {
+    var uid = rand16(), id = rand16();
+    var msg = {
+      type: "image", uploading: true, time: Date.now(), name: S.name, color: S.msgColor,
+      text: "", file: { id: id, name: fname, size: blob.size, uid: uid }
+    };
+    pushMsg(msg);
+    var xhr = new XMLHttpRequest();
+    xhr.open("PUT", FILE_UP + encodeURIComponent(uid + "/" + fname));
+    xhr.upload.onprogress = function (e) {
+      if (!e.lengthComputable) return;
+      var pct = Math.round(e.loaded / e.total * 100);
+      var el = $("msg-list").querySelector('.msg[data-fid="' + id + '"]');
+      if (!el) return;
+      var p = el.querySelector('[data-role="pct"]'), b = el.querySelector('[data-role="bar"]');
+      if (p) p.textContent = pct + "%";
+      if (b) b.style.width = pct + "%";
+    };
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300 && (xhr.responseText === "" || xhr.responseText === "1")) {
+        msg.uploading = false;
+        saveHistory();
+        var el = $("msg-list").querySelector('.msg[data-fid="' + id + '"]');
+        if (el) {
+          var bub = el.querySelector(".img-bubble");
+          if (bub) bub.outerHTML = imageBubbleHtml(msg);
+        }
+        /* 广播图片消息：\u200bIMG\u200buid\u200benc文件名\u200b（正文留空） */
+        var pre = S.msgColor ? ("\u200bC#" + S.msgColor + "\u200b") : "";
+        safeSend({ type: "message", data: { message: pre + MARK_IMG + uid + "\u200b" + encodeURIComponent(fname) + "\u200b", time: Date.now() } });
+        toast("图片发送成功");
+      } else {
+        removeFileCard(id);
+        toast("图片上传失败（" + xhr.status + "）");
+      }
+    };
+    xhr.onerror = function () { removeFileCard(id); toast("图片上传失败，请检查网络"); };
+    xhr.ontimeout = function () { removeFileCard(id); toast("图片上传超时"); };
+    xhr.send(blob);
+  }
+}
+/* 大图压缩：canvas 重绘为 JPEG（长边 maxSide，质量 q），失败或更大则用原图 */
+function compressImage(file, maxSide, q, done) {
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function () {
+    URL.revokeObjectURL(url);
+    try {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      var cv = document.createElement("canvas");
+      cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(function (blob) {
+        if (blob && blob.size < file.size) {
+          var base = file.name.replace(/\.[^.]+$/, "");
+          done(blob, base + "-压缩.jpg");
+        } else done(null, null);
+      }, "image/jpeg", q);
+    } catch (e) { done(null, null); }
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); done(null, null); };
+  img.src = url;
 }
 
 /* ---------- 启动 ---------- */
