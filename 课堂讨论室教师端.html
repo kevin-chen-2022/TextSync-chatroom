@@ -176,6 +176,7 @@
     border-radius: 4px; padding: 1px 5px;
   }
   .badge-q { background: #ffedd5; color: #c2410c; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 5px; }
+  .badge-a { background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 5px; }
   .bubble {
     position: relative; background: #fff; border: 1px solid var(--line);
     border-radius: 4px 14px 14px 14px; padding: 9px 13px;
@@ -185,6 +186,7 @@
   .msg.mine .bubble { background: var(--pink-soft); border-color: var(--pink-border); border-radius: 14px 4px 14px 14px; }
   .msg.is-t .bubble { background: #fdf2f8; border-color: var(--pink-border); border-radius: 4px 14px 14px 14px; }
   .msg.is-q .bubble { border-left: 4px solid #f97316; }
+  .msg.is-a .bubble { border-left: 4px solid #10b981; }
   .sysmsg { text-align: center; font-size: 12px; color: #9ca3af; margin: 10px 0; }
 
   /* 文件卡片 */
@@ -216,14 +218,17 @@
   }
   #btn-file:active { background: var(--line); }
 
-  /* 教师上屏按钮 */
-  .pin-btn {
-    display: none; flex: none; align-self: center;
+  /* 教师消息操作按钮：上屏 / 复制 / 发送到编辑框（悬停或点击消息显示） */
+  .msg-acts { display: none; flex: none; align-self: center; flex-direction: column; gap: 6px; }
+  .msg-acts button {
     font-size: 12px; color: var(--warn); background: #fffbeb;
     border: 1px solid #fde68a; border-radius: 8px; padding: 4px 8px; font-weight: 600;
   }
-  body.is-teacher .msg:not(.mine):hover .pin-btn { display: block; }
-  body.is-teacher .msg:not(.mine):hover { background: #fafafa; border-radius: 10px; }
+  .msg-acts .copy-btn, .msg-acts .fwd-btn { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
+  body.is-teacher .msg:not(.mine):hover .msg-acts,
+  body.is-teacher .msg:not(.mine).acts-on .msg-acts { display: flex; }
+  body.is-teacher .msg:not(.mine):hover,
+  body.is-teacher .msg:not(.mine).acts-on { background: #fafafa; border-radius: 10px; }
 
   /* 回到底部 */
   #btn-bottom {
@@ -254,6 +259,8 @@
     border: 1.5px solid var(--line); background: #fff; color: var(--muted);
   }
   .type-btn.on-q { border-color: #f97316; color: #c2410c; background: #fff7ed; }
+  .type-btn.on-a { border-color: #10b981; color: #15803d; background: #f0fdf4; }
+  .type-btn.mini { color: #9ca3af; border-style: dashed; }
   .char-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
   .input-row { display: flex; gap: 8px; align-items: flex-end; }
   #msg-input {
@@ -366,7 +373,7 @@
       <button class="fs-btn" id="fs-plus" type="button">A+</button>
       <button class="fs-btn" id="fs-reset" type="button">重置</button>
     </div>
-    <button class="tb-btn" id="btn-onlyq" type="button" title="只看学生提问">只看提问</button>
+    <button class="tb-btn" id="btn-onlyq" type="button" title="只看教师提问与学生回答">只看问答</button>
     <button class="tb-btn" id="btn-settings" type="button">设置</button>
     <button class="tb-btn" id="btn-export" type="button">导出</button>
     <button class="tb-btn" id="btn-clear" type="button">清屏</button>
@@ -381,7 +388,7 @@
 
   <!-- 教师公告编辑条 -->
   <div id="notice-edit">
-    <textarea id="notice-input" maxlength="200" placeholder="输入公告内容，发布后全班置顶显示（最多 200 字）"></textarea>
+    <textarea id="notice-input" maxlength="200" placeholder="输入公告内容（最多 200 字），发布后全班置顶；撤下请点右侧按钮"></textarea>
     <div class="ne-col">
       <button class="ne-btn" id="btn-notice-send" type="button">发布公告</button>
       <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
@@ -400,6 +407,9 @@
     <div class="type-row">
       <button class="type-btn on" id="type-normal" type="button">发言</button>
       <button class="type-btn" id="type-question" type="button">提问</button>
+      <button class="type-btn" id="type-answer" type="button">回答</button>
+      <button class="type-btn mini" id="btn-wipe" type="button" title="清空输入框">清空</button>
+      <button class="type-btn mini" id="btn-paste" type="button" title="从剪贴板粘贴">粘贴</button>
       <span class="char-count"><span id="char-num">0</span>/300</span>
     </div>
     <div class="input-row">
@@ -460,6 +470,7 @@
    扩展约定（纯前端解析，用户手打不出来，避免误判）：
      \u200bA\u200b 开头 = 教师公告（置顶，不进消息流）
      \u200bQ\u200b 开头 = 提问（橙色左边线 + 「问」标签）
+     \u200bH\u200b 开头 = 回答（绿色左边线 + 「答」标签）
    ===================================================================== */
 
 /* ---------- 常量与全局状态 ---------- */
@@ -470,6 +481,7 @@ var FILE_MAX = 80 * 1024 * 1024;   // 单文件上限 80MB（协议 ≥90MB 需�
 var TEACHER_KEY = "1234";          // 教师口令（防误入，防不了有心人；可自行修改）
 var MARK_A = "\u200bA\u200b";      // 公告标记
 var MARK_Q = "\u200bQ\u200b";      // 提问标记
+var MARK_H = "\u200bH\u200b";      // 回答标记
 var TEACHER_MARK = "\u2005";       // 教师名字前缀：四分之一空格（不可见，用于识别）
 var MAX_KEEP = 300;                // 本地最多保留的历史消息条数
 var SEND_GAP = 2000;               // 发送节流（毫秒）
@@ -479,12 +491,12 @@ var S = {
   room: "", name: "", isTeacher: false,
   ws: null, wsOk: false, retry: 0, retryTimer: null, closedByUser: false,
   members: {},                      // 名单（joined 加入，quit 移除）
-  msgs: [],                         // 本机历史 {name, text, time, type, mine}
+  msgs: [],                         // 本机历史 {name, text, time, type}
   notice: "",                       // 当前公告内容（本机缓存）
   fileCache: {},                    // 房间文件缓存 id → {id,name,size,uid,username}（教师重发用）
   replayedTo: {},                   // 公告重发记录（每次进房重置）
   fileReplayedTo: {},               // 文件列表重发记录
-  msgType: "normal",                // normal | question
+  msgType: "normal",                // normal | question | answer
   fontSize: 18,
   lastSend: 0,
   onlyQ: false,
@@ -511,9 +523,40 @@ function toast(t) {
   clearTimeout(el._t);
   el._t = setTimeout(function () { el.classList.remove("show"); }, 1800);
 }
+/* 复制到系统剪贴板（clipboard API 优先，execCommand 兜底） */
+function copyText(t) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(
+      function () { toast("已复制到剪贴板"); },
+      function () { fallbackCopy(t); }
+    );
+  } else fallbackCopy(t);
+}
+function fallbackCopy(t) {
+  var ta = document.createElement("textarea");
+  ta.value = t;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); toast("已复制到剪贴板"); }
+  catch (e) { toast("复制失败，请手动复制"); }
+  document.body.removeChild(ta);
+}
+/* 消息类型切换（发言 / 提问 / 回答） */
+function setType(t) {
+  S.msgType = t;
+  $("type-normal").classList.toggle("on", t === "normal");
+  $("type-question").classList.toggle("on-q", t === "question");
+  $("type-answer").classList.toggle("on-a", t === "answer");
+  $("msg-input").placeholder =
+    t === "question" ? "输入你的问题，老师会优先看到" :
+    t === "answer"   ? "输入你的回答，全班都能看到" :
+    "想好再发，点击「发送」或按 Ctrl+Enter";
+}
 function isTeacherName(n) { return typeof n === "string" && n.indexOf(TEACHER_MARK) === 0; }
 function displayName(n) { return isTeacherName(n) ? n.slice(1) : n; }
-function stripMark(t) { return t.replace(/\u200b[QA]\u200b/g, ""); }
+function stripMark(t) { return t.replace(/\u200b[QAH]\u200b/g, ""); }
 function rand16() {
   var s = "abcdefghijklmnopqrstuvwxyz0123456789", r = "";
   for (var i = 0; i < 16; i++) r += s.charAt(Math.floor(Math.random() * s.length));
@@ -657,11 +700,11 @@ function handleServerMsg(m) {
       renderNotice(changed);                    // 内容相同（如教师重发）不重复弹提示
       return;
     }
-    /* 普通消息 / 提问 */
-    var type = raw.indexOf(MARK_Q) === 0 ? "question" : "normal";
+    /* 普通消息 / 提问 / 回答 */
+    var type = raw.indexOf(MARK_Q) === 0 ? "question" : (raw.indexOf(MARK_H) === 0 ? "answer" : "normal");
     var text = stripMark(raw);
     if (!text.trim()) return;
-    pushMsg({ name: name, text: text, time: time, type: type, mine: false });
+    pushMsg({ name: name, text: text, time: time, type: type });
   } else if (m.type === "addFile") {
     var f = m.data;
     if (f && f.id && f.name) pushMsg(fileToMsg(f));
@@ -678,7 +721,7 @@ function handleServerMsg(m) {
 /* 服务器文件对象 → 本地消息对象 */
 function fileToMsg(f) {
   return {
-    type: "file", mine: false, time: Date.now(),
+    type: "file", time: Date.now(),
     name: f.username || "匿名",
     file: { id: f.id, name: f.name, size: f.size || 0, uid: f.uid }
   };
@@ -762,11 +805,16 @@ function pushMsg(msg, skipSave) {
   renderMsg(msg);
 }
 function renderMsg(msg) {
-  if (S.onlyQ && msg.type !== "question") { applyOnlyQFilter(); return; }
+  /* mine 按发送者名字实时判断，不信任历史记录里的标记
+     （教师端/学生端页面在同一浏览器共用 localStorage 历史，存的 mine 会互相污染） */
+  var mine = msg.name === S.name;
+  var isT = isTeacherName(msg.name);
+  if (S.onlyQ && !((isT && msg.type === "question") || msg.type === "answer")) { applyOnlyQFilter(); return; }
   var list = $("msg-list");
   var div = document.createElement("div");
-  div.className = "msg" + (isTeacherName(msg.name) ? " is-t" : "") +
-                  (msg.mine ? " mine" : "") + (msg.type === "question" ? " is-q" : "");
+  div.className = "msg" + (isT ? " is-t" : "") +
+                  (mine ? " mine" : "") + (msg.type === "question" ? " is-q" : "") +
+                  (msg.type === "answer" ? " is-a" : "");
   if (msg.type === "file") div.setAttribute("data-fid", msg.file.id);
   var initial = displayName(msg.name).slice(0, 1) || "?";
   var icoSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
@@ -780,22 +828,48 @@ function renderMsg(msg) {
     '<div class="avatar">' + esc(initial) + "</div>" +
     '<div class="bubble-col">' +
       '<div class="meta">' +
-        (isTeacherName(msg.name) ? '<span class="badge-t">师</span>' : "") +
-        "<span>" + esc(displayName(msg.name)) + (msg.mine ? "（我）" : "") + "</span>" +
+        (isT ? '<span class="badge-t">师</span>' : "") +
+        "<span>" + esc(displayName(msg.name)) + (mine ? "（我）" : "") + "</span>" +
         (msg.type === "question" ? '<span class="badge-q">问</span>' : "") +
+        (msg.type === "answer" ? '<span class="badge-a">答</span>' : "") +
         "<span>" + hhmm(msg.time) + "</span>" +
       "</div>" + body +
     "</div>" +
-    (msg.type === "file" ? "" : '<button class="pin-btn" type="button">上屏</button>');
+    (msg.type === "file" ? "" :
+      '<span class="msg-acts">' +
+        '<button class="pin-btn" type="button">上屏</button>' +
+        '<button class="copy-btn" type="button">复制</button>' +
+        '<button class="fwd-btn" type="button">发送</button>' +
+      "</span>");
   div.innerHTML = html;
 
-  /* 教师可一键把学生发言引用上屏 */
-  var pin = div.querySelector(".pin-btn");
-  if (pin) {
-    pin.onclick = function () {
+  /* 教师消息操作：上屏 / 复制 / 发送到编辑框（悬停或点击消息显示，点击别处不自动收起） */
+  var acts = div.querySelector(".msg-acts");
+  if (acts) {
+    acts.addEventListener("click", function (e) { e.stopPropagation(); });
+    acts.querySelector(".pin-btn").onclick = function () {
       pinToScreen(displayName(msg.name), msg.text);
     };
+    acts.querySelector(".copy-btn").onclick = function () {
+      copyText(displayName(msg.name) + "：" + msg.text);
+    };
+    acts.querySelector(".fwd-btn").onclick = function () {
+      var input = $("msg-input");
+      input.value = msg.text;
+      setType(msg.type === "question" ? "question" : (msg.type === "answer" ? "answer" : "normal"));
+      $("char-num").textContent = input.value.length;
+      input.focus();
+      toast("已放入编辑框，可修改后发送");
+    };
   }
+  /* 点击消息气泡切换显示操作按钮（触屏无 hover） */
+  div.addEventListener("click", function () {
+    if (!S.isTeacher || msg.type === "file") return;
+    var on = div.classList.contains("acts-on");
+    var olds = list.querySelectorAll(".msg.acts-on");
+    for (var k = 0; k < olds.length; k++) olds[k].classList.remove("acts-on");
+    if (!on) div.classList.add("acts-on");
+  });
 
   list.appendChild(div);
   trimDom();
@@ -847,8 +921,10 @@ function applyOnlyQFilter() {
   var list = $("msg-list");
   var items = list.querySelectorAll(".msg");
   for (var i = 0; i < items.length; i++) {
-    var isQ = items[i].className.indexOf("is-q") >= 0;
-    items[i].style.display = (S.onlyQ && !isQ) ? "none" : "";
+    var cn = items[i].className;
+    /* 只看问答：教师的提问 + 所有人的回答 */
+    var qa = (cn.indexOf("is-t") >= 0 && cn.indexOf("is-q") >= 0) || cn.indexOf("is-a") >= 0;
+    items[i].style.display = (S.onlyQ && !qa) ? "none" : "";
   }
 }
 
@@ -867,6 +943,14 @@ function maybeReplayNotice(name) {
   }, 1000);
 }
 function renderNotice(alsoToast) {
+  /* 教师：公告显示与编辑合并为同一个文本框（编辑框内容即当前公告，节约空间）；
+     学生：仍走置顶公告条 */
+  if (S.isTeacher) {
+    var ta = $("notice-input");
+    if (document.activeElement !== ta) ta.value = S.notice; // 正在输入时不覆盖
+    if (alsoToast) toast(S.notice ? "收到新公告" : "公告已被撤下");
+    return;
+  }
   var bar = $("notice-bar");
   if (S.notice) {
     $("notice-text").textContent = S.notice;
@@ -968,17 +1052,27 @@ function bindRoom() {
   var input = $("msg-input");
 
   /* 类型切换 */
-  $("type-normal").onclick = function () {
-    S.msgType = "normal";
-    this.classList.add("on");
-    $("type-question").classList.remove("on-q");
-    input.placeholder = "想好再发，点击「发送」或按 Ctrl+Enter";
+  $("type-normal").onclick = function () { setType("normal"); };
+  $("type-question").onclick = function () { setType("question"); };
+  $("type-answer").onclick = function () { setType("answer"); };
+
+  /* 清空 / 粘贴 */
+  $("btn-wipe").onclick = function () {
+    input.value = "";
+    $("char-num").textContent = "0";
+    input.focus();
   };
-  $("type-question").onclick = function () {
-    S.msgType = "question";
-    this.classList.add("on-q");
-    $("type-normal").classList.remove("on");
-    input.placeholder = "输入你的问题，老师会优先看到";
+  $("btn-paste").onclick = function () {
+    if (!navigator.clipboard || !navigator.clipboard.readText) { toast("浏览器不支持一键粘贴，请用 Ctrl+V"); return; }
+    navigator.clipboard.readText().then(function (t) {
+      if (!t) { toast("剪贴板是空的"); return; }
+      var st = input.selectionStart == null ? input.value.length : input.selectionStart;
+      var en = input.selectionEnd == null ? st : input.selectionEnd;
+      input.value = input.value.slice(0, st) + t + input.value.slice(en);
+      $("char-num").textContent = input.value.length;
+      input.focus();
+      input.setSelectionRange(st + t.length, st + t.length);
+    }).catch(function () { toast("读取剪贴板失败，请用 Ctrl+V"); });
   };
 
   input.addEventListener("input", function () { $("char-num").textContent = input.value.length; });
@@ -1016,14 +1110,13 @@ function bindRoom() {
     applyOnlyQFilter();
   };
 
-  /* 公告 */
+  /* 公告（教师：编辑框即显示框，发布后保留内容） */
   $("btn-notice-send").onclick = function () {
     var t = $("notice-input").value.trim();
     if (!t) { toast("公告内容不能为空"); return; }
     if (safeSend({ type: "message", data: { message: MARK_A + t, time: Date.now() } })) {
       S.notice = t;
       renderNotice(false);
-      $("notice-input").value = "";
       toast("公告已发布");
     }
   };
@@ -1050,7 +1143,7 @@ function bindRoom() {
       var head = "[" + new Date(m.time).toLocaleTimeString() + "] " + displayName(m.name) + " ";
       if (m.type === "file") lines.push(head + "[文件]：" + m.file.name + "（" + fmtSize(m.file.size) + "）");
       else {
-        var tag = m.type === "question" ? "[提问]" : (isTeacherName(m.name) ? "[教师]" : "");
+        var tag = m.type === "question" ? "[提问]" : (m.type === "answer" ? "[回答]" : (isTeacherName(m.name) ? "[教师]" : ""));
         lines.push(head + tag + "：" + m.text);
       }
     }
@@ -1128,15 +1221,15 @@ function sendMsg() {
     toast("发送太频繁，休息 " + Math.ceil((SEND_GAP - (now - S.lastSend)) / 1000) + " 秒");
     return;
   }
-  var payload = S.msgType === "question" ? (MARK_Q + text) : text;
+  var payload = S.msgType === "question" ? (MARK_Q + text) : (S.msgType === "answer" ? (MARK_H + text) : text);
   payload = applyFilter(payload);
-  if (!payload.replace(MARK_Q, "").trim()) { toast("内容已被敏感词全部过滤"); return; }
+  if (!payload.replace(MARK_Q, "").replace(MARK_H, "").trim()) { toast("内容已被敏感词全部过滤"); return; }
   if (!safeSend({ type: "message", data: { message: payload, time: now } })) return;
   S.lastSend = now;
   /* 本机立即回显（服务器不会把消息发回给发送者本人） */
   pushMsg({
     name: S.name, text: text, time: now,
-    type: S.msgType === "question" ? "question" : "normal", mine: true
+    type: S.msgType === "question" ? "question" : (S.msgType === "answer" ? "answer" : "normal")
   });
   input.value = "";
   $("char-num").textContent = "0";
@@ -1150,7 +1243,7 @@ function sendFile(file) {
   if (!S.ws || S.ws.readyState !== 1) { toast("尚未连上服务器，稍候再试"); return; }
   var uid = rand16(), id = rand16();
   var msg = {
-    type: "file", mine: true, uploading: true, time: Date.now(), name: S.name,
+    type: "file", uploading: true, time: Date.now(), name: S.name,
     file: { id: id, name: file.name, size: file.size, uid: uid }
   };
   pushMsg(msg);
