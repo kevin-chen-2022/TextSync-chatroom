@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>课堂讨论室 · 教师端</title>
+<style>
+  /* ========== 基础 ========== */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --pink: #ec4899;
+    --pink-deep: #db2777;
+    --pink-soft: #fdf2f8;
+    --pink-border: #fbcfe8;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #f5f6f8;
+    --ok: #10b981;
+    --warn: #f59e0b;
+    --radius: 14px;
+    --msg-size: 18px; /* 消息字号，可调 */
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    overflow: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  textarea, input { font-family: inherit; outline: none; }
+
+  /* ========== 进房页 ========== */
+  #view-join {
+    height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 45%, #ec4899 100%);
+    overflow: auto; padding: 20px;
+  }
+  .join-card {
+    width: 100%; max-width: 420px;
+    background: rgba(255,255,255,.96);
+    border-radius: 20px; padding: 32px 28px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.25);
+  }
+  .join-card h1 { font-size: 26px; text-align: center; color: var(--ink); }
+  .join-card .sub { text-align: center; color: var(--muted); font-size: 14px; margin: 8px 0 24px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+  .field input {
+    width: 100%; padding: 12px 14px; font-size: 16px;
+    border: 2px solid var(--line); border-radius: 10px; transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--pink); }
+  .role-row { display: flex; gap: 10px; }
+  .role-btn {
+    flex: 1; padding: 11px 0; border-radius: 10px; font-size: 15px;
+    border: 2px solid var(--line); background: #fff; color: var(--muted); font-weight: 600;
+    transition: all .15s;
+  }
+  .role-btn.on { border-color: var(--pink); color: var(--pink-deep); background: var(--pink-soft); }
+  #btn-join {
+    width: 100%; margin-top: 8px; padding: 14px 0;
+    background: linear-gradient(90deg, var(--pink), var(--pink-deep));
+    color: #fff; font-size: 17px; font-weight: 700; border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(236,72,153,.4);
+    transition: transform .1s;
+  }
+  #btn-join:active { transform: scale(.97); }
+  .join-tip { margin-top: 16px; font-size: 12px; color: #9ca3af; text-align: center; line-height: 1.6; }
+  .join-err { color: #dc2626; font-size: 13px; text-align: center; min-height: 18px; margin-top: 8px; }
+
+  /* ========== 讨论页框架 ========== */
+  #view-room { display: none; height: 100%; flex-direction: column; }
+
+  /* 顶栏 */
+  #topbar {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: #fff; border-bottom: 1px solid var(--line);
+    overflow-x: auto; white-space: nowrap; scrollbar-width: none;
+  }
+  #topbar::-webkit-scrollbar { display: none; }
+  .tb-room {
+    font-weight: 800; font-size: 18px; color: var(--pink-deep);
+    letter-spacing: 1px; flex: none;
+  }
+  .tb-room small { font-size: 11px; color: var(--muted); font-weight: 400; letter-spacing: 0; display: block; line-height: 1; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; flex: none; }
+  .dot.ok { background: var(--ok); }
+  .dot.bad { background: #ef4444; }
+  .tb-members {
+    flex: none; font-size: 13px; color: var(--muted); cursor: pointer;
+    padding: 4px 8px; border-radius: 8px;
+  }
+  .tb-members:hover { background: var(--bg); }
+  .tb-spacer { flex: 1; }
+  .tb-btn {
+    flex: none; padding: 6px 10px; font-size: 13px; border-radius: 8px;
+    background: var(--bg); color: var(--ink); font-weight: 600;
+  }
+  .tb-btn:active { background: var(--line); }
+  .tb-btn.on { background: var(--pink-soft); color: var(--pink-deep); }
+  .fs-group { flex: none; display: flex; align-items: center; gap: 4px; }
+  .fs-btn {
+    width: 32px; height: 30px; border-radius: 8px; background: var(--bg);
+    font-weight: 800; font-size: 14px; color: var(--ink);
+  }
+  #fs-reset { width: auto; padding: 0 8px; font-size: 12px; font-weight: 600; }
+
+  /* 成员名单浮层 */
+  #member-pop {
+    display: none; position: fixed; top: 52px; left: 12px; z-index: 60;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15); padding: 10px 14px;
+    max-width: 70vw; max-height: 50vh; overflow: auto;
+  }
+  #member-pop h4 { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  #member-pop .mrow { font-size: 14px; padding: 3px 0; }
+  #member-pop .mrow.is-t { color: var(--pink-deep); font-weight: 700; }
+
+  /* 公告区 */
+  #notice-bar {
+    flex: none; background: linear-gradient(90deg, #fff7ed, #fef3c7);
+    border-bottom: 1px solid #fde68a; padding: 8px 14px;
+    display: none; align-items: flex-start; gap: 8px;
+  }
+  #notice-bar.show { display: flex; }
+  #notice-bar .n-tag {
+    flex: none; background: var(--warn); color: #fff; font-size: 12px; font-weight: 700;
+    border-radius: 6px; padding: 2px 7px; margin-top: 2px;
+  }
+  #notice-text { flex: 1; font-size: var(--msg-size); line-height: 1.55; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
+  #notice-fold { flex: none; background: none; color: var(--muted); font-size: 12px; padding: 4px; }
+  #notice-bar.folded #notice-text { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* 教师公告编辑 */
+  #notice-edit {
+    flex: none; display: none; gap: 8px; padding: 8px 12px;
+    background: #fffbeb; border-bottom: 1px solid #fde68a;
+  }
+  #notice-edit.show { display: flex; }
+  #notice-input {
+    flex: 1; resize: none; border: 2px solid #fde68a; border-radius: 10px;
+    padding: 8px 10px; font-size: 15px; min-height: 40px; max-height: 120px; background: #fff;
+  }
+  #notice-input:focus { border-color: var(--warn); }
+  .ne-col { display: flex; flex-direction: column; gap: 6px; }
+  .ne-btn {
+    padding: 8px 14px; border-radius: 9px; font-size: 14px; font-weight: 700;
+    background: var(--warn); color: #fff;
+  }
+  .ne-btn.gray { background: var(--line); color: var(--muted); }
+
+  /* 消息流 */
+  #msg-wrap { flex: 1; position: relative; overflow: hidden; }
+  #msg-list {
+    height: 100%; overflow-y: auto; padding: 12px 14px 20px;
+    scroll-behavior: smooth;
+  }
+  .msg { display: flex; gap: 8px; margin-bottom: 12px; align-items: flex-start; }
+  .msg.mine { flex-direction: row-reverse; }
+  .avatar {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff;
+    background: linear-gradient(135deg, #64748b, #475569);
+    margin-top: 2px; user-select: none;
+  }
+  .msg.is-t .avatar { background: linear-gradient(135deg, var(--pink), var(--pink-deep)); }
+  .bubble-col { max-width: 78%; display: flex; flex-direction: column; }
+  .msg.mine .bubble-col { align-items: flex-end; }
+  .meta { font-size: 12px; color: var(--muted); margin: 0 4px 3px; display: flex; gap: 6px; align-items: center; }
+  .badge-t {
+    background: var(--pink); color: #fff; font-size: 11px; font-weight: 700;
+    border-radius: 4px; padding: 1px 5px;
+  }
+  .badge-q { background: #ffedd5; color: #c2410c; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 5px; }
+  .bubble {
+    position: relative; background: #fff; border: 1px solid var(--line);
+    border-radius: 4px 14px 14px 14px; padding: 9px 13px;
+    font-size: var(--msg-size); line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.mine .bubble { background: var(--pink-soft); border-color: var(--pink-border); border-radius: 14px 4px 14px 14px; }
+  .msg.is-t .bubble { background: #fdf2f8; border-color: var(--pink-border); border-radius: 4px 14px 14px 14px; }
+  .msg.is-q .bubble { border-left: 4px solid #f97316; }
+  .sysmsg { text-align: center; font-size: 12px; color: #9ca3af; margin: 10px 0; }
+
+  /* 文件卡片 */
+  .file-card {
+    display: flex; align-items: center; gap: 10px; min-width: 220px; max-width: 100%;
+  }
+  .file-ico {
+    flex: none; width: 40px; height: 40px; border-radius: 10px;
+    background: #eff6ff; color: #2563eb;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 14px; font-weight: 600; word-break: break-all; line-height: 1.4; }
+  .file-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .fbtn {
+    flex: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700;
+    background: #2563eb; color: #fff; text-decoration: none;
+  }
+  .fbtn:active { opacity: .85; }
+  .fdel {
+    flex: none; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    background: #fee2e2; color: #dc2626;
+  }
+  .fprog { width: 100%; height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: 6px; }
+  .fprog em { display: block; height: 100%; width: 0; background: var(--pink); border-radius: 999px; transition: width .2s; }
+  #btn-file {
+    flex: none; width: 38px; height: 38px; border-radius: 12px; font-size: 19px;
+    background: var(--bg); color: var(--ink); margin-bottom: 2px;
+  }
+  #btn-file:active { background: var(--line); }
+
+  /* 教师上屏按钮 */
+  .pin-btn {
+    display: none; flex: none; align-self: center;
+    font-size: 12px; color: var(--warn); background: #fffbeb;
+    border: 1px solid #fde68a; border-radius: 8px; padding: 4px 8px; font-weight: 600;
+  }
+  body.is-teacher .msg:not(.mine):hover .pin-btn { display: block; }
+  body.is-teacher .msg:not(.mine):hover { background: #fafafa; border-radius: 10px; }
+
+  /* 回到底部 */
+  #btn-bottom {
+    display: none; position: absolute; right: 16px; bottom: 16px; z-index: 20;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #fff; border: 1px solid var(--line);
+    box-shadow: 0 4px 14px rgba(0,0,0,.15);
+    font-size: 18px; color: var(--pink-deep); font-weight: 800;
+  }
+  #btn-bottom.show { display: block; }
+
+  /* 断线提示 */
+  #conn-tip {
+    display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 30; background: #ef4444; color: #fff; font-size: 13px; font-weight: 600;
+    padding: 6px 16px; border-radius: 999px; box-shadow: 0 4px 12px rgba(239,68,68,.4);
+  }
+  #conn-tip.show { display: block; }
+
+  /* 输入区 */
+  #input-bar {
+    flex: none; background: #fff; border-top: 1px solid var(--line);
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+  .type-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .type-btn {
+    padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 700;
+    border: 1.5px solid var(--line); background: #fff; color: var(--muted);
+  }
+  .type-btn.on-q { border-color: #f97316; color: #c2410c; background: #fff7ed; }
+  .char-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  #msg-input {
+    flex: 1; resize: none; border: 2px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; font-size: 16px; line-height: 1.5;
+    min-height: 46px; max-height: 130px; background: var(--bg);
+    transition: border-color .15s;
+  }
+  #msg-input:focus { border-color: var(--pink); background: #fff; }
+  #btn-send {
+    flex: none; padding: 12px 22px; border-radius: 12px;
+    background: linear-gradient(90deg, var(--pink), var(--pink-deep));
+    color: #fff; font-size: 16px; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(236,72,153,.35);
+  }
+  #btn-send:disabled { opacity: .5; box-shadow: none; }
+
+  /* 设置弹层 */
+  #settings-mask {
+    display: none; position: fixed; inset: 0; z-index: 80;
+    background: rgba(0,0,0,.35);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  #settings-mask.show { display: flex; }
+  .settings-card {
+    width: 100%; max-width: 420px; background: #fff; border-radius: 16px; padding: 20px;
+    max-height: 80vh; overflow: auto;
+  }
+  .settings-card h3 { font-size: 17px; margin-bottom: 14px; }
+  .settings-card textarea {
+    width: 100%; min-height: 70px; border: 2px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; font-size: 14px; resize: vertical;
+  }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; }
+  .settings-row span { font-size: 14px; }
+  .settings-tip { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+  .st-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .st-actions button {
+    flex: 1; padding: 11px 0; border-radius: 10px; font-size: 15px; font-weight: 700;
+  }
+  #st-save { background: var(--pink); color: #fff; }
+  #st-cancel { background: var(--bg); color: var(--muted); }
+  .switch { position: relative; width: 44px; height: 24px; }
+  .switch input { display: none; }
+  .switch em {
+    position: absolute; inset: 0; border-radius: 999px; background: #d1d5db; transition: .2s;
+  }
+  .switch em::after {
+    content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #fff; transition: .2s;
+  }
+  .switch input:checked + em { background: var(--pink); }
+  .switch input:checked + em::after { transform: translateX(20px); }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 110px; transform: translateX(-50%);
+    background: rgba(31,41,55,.9); color: #fff; font-size: 14px;
+    padding: 8px 18px; border-radius: 999px; z-index: 99;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  #toast.show { opacity: 1; }
+
+  /* 手机窄屏 */
+  @media (max-width: 520px) {
+    .bubble-col { max-width: 86%; }
+    .tb-room { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= 进房页 ================= -->
+<div id="view-join">
+  <div class="join-card">
+    <h1>课堂讨论室 · 教师端</h1>
+    <p class="sub">教师专用：发公告、上屏学生发言、管理文件</p>
+    <div class="field">
+      <label>房间号（5 位字母或数字，全班统一）</label>
+      <input id="in-room" maxlength="5" placeholder="例如：a1b2c" autocapitalize="characters" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>你的名字</label>
+      <input id="in-name" maxlength="12" placeholder="例如：张老师" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>教师口令</label>
+      <input id="in-key" type="password" maxlength="12" placeholder="默认 1234，可向管理员索取" autocomplete="off">
+    </div>
+    <button id="btn-join" type="button">进入讨论</button>
+    <p class="join-err" id="join-err"></p>
+    <p class="join-tip">
+      学生请使用「学生端」页面进房<br>
+      可发布置顶公告、引用学生发言上屏、撤下文件；口令在文件开头 TEACHER_KEY 处修改
+    </p>
+  </div>
+</div>
+
+<!-- ================= 讨论页 ================= -->
+<div id="view-room">
+
+  <!-- 顶栏 -->
+  <div id="topbar">
+    <div class="tb-room"><small>房间号</small><span id="tb-room-id">-----</span></div>
+    <span class="dot" id="conn-dot"></span>
+    <span class="tb-members" id="tb-members">成员 1</span>
+    <span class="tb-spacer"></span>
+    <div class="fs-group" title="调整消息字号，方便后排观看">
+      <button class="fs-btn" id="fs-minus" type="button">A-</button>
+      <button class="fs-btn" id="fs-plus" type="button">A+</button>
+      <button class="fs-btn" id="fs-reset" type="button">重置</button>
+    </div>
+    <button class="tb-btn" id="btn-onlyq" type="button" title="只看学生提问">只看提问</button>
+    <button class="tb-btn" id="btn-settings" type="button">设置</button>
+    <button class="tb-btn" id="btn-export" type="button">导出</button>
+    <button class="tb-btn" id="btn-clear" type="button">清屏</button>
+  </div>
+
+  <!-- 教师公告（置顶显示，不随消息滚动） -->
+  <div id="notice-bar">
+    <span class="n-tag">公告</span>
+    <div id="notice-text"></div>
+    <button id="notice-fold" type="button">收起</button>
+  </div>
+
+  <!-- 教师公告编辑条 -->
+  <div id="notice-edit">
+    <textarea id="notice-input" maxlength="200" placeholder="输入公告内容，发布后全班置顶显示（最多 200 字）"></textarea>
+    <div class="ne-col">
+      <button class="ne-btn" id="btn-notice-send" type="button">发布公告</button>
+      <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
+    </div>
+  </div>
+
+  <!-- 消息流 -->
+  <div id="msg-wrap">
+    <div id="msg-list"></div>
+    <button id="btn-bottom" type="button">↓</button>
+    <div id="conn-tip">连接已断开，正在重连…</div>
+  </div>
+
+  <!-- 输入区 -->
+  <div id="input-bar">
+    <div class="type-row">
+      <button class="type-btn on" id="type-normal" type="button">发言</button>
+      <button class="type-btn" id="type-question" type="button">提问</button>
+      <span class="char-count"><span id="char-num">0</span>/300</span>
+    </div>
+    <div class="input-row">
+      <button id="btn-file" type="button" title="发送文件（最大 80MB）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+      <textarea id="msg-input" maxlength="300" placeholder="想好再发，点击「发送」或按 Ctrl+Enter"></textarea>
+      <button id="btn-send" type="button">发 送</button>
+      <input type="file" id="file-in" hidden>
+    </div>
+  </div>
+
+  <!-- 成员名单 -->
+  <div id="member-pop">
+    <h4>已加入成员（离开者不会自动移出名单）</h4>
+    <div id="member-list"></div>
+  </div>
+</div>
+
+<!-- 设置弹层 -->
+<div id="settings-mask">
+  <div class="settings-card">
+    <h3>设置</h3>
+    <p class="settings-tip">敏感词（用逗号分隔）。发送时自动替换为 **，此列表仅保存在本机、只过滤自己的发言。已内置一份基础列表。</p>
+    <div class="settings-row">
+      <span>启用敏感词过滤</span>
+      <label class="switch"><input type="checkbox" id="st-filter-on"><em></em></label>
+    </div>
+    <textarea id="st-words" placeholder="例：词1，词2，词3"></textarea>
+    <div class="st-actions">
+      <button id="st-cancel" type="button">取消</button>
+      <button id="st-save" type="button">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   课堂讨论室 · 教师端（拆分版：固定教师身份，需口令）—— 单文件
+   后端直连 TextSync 公共 WebSocket 房间；与 整合版/学生端 报文完全兼容
+   协议（逆向自 text-sync.com 前端，2026-10 实测有效）：
+     连接  wss://api2.text-sync.com/api/room/{5位ID}/websocket
+     握手  发 {"type":"name","data":"昵称"} → 收 joined / ready
+     发言  {"type":"message","data":{"message":"文本","time":毫秒}}
+           服务器广播时会自动附上发送者 name 字段
+     文件  PUT https://api3.text-sync.com/wuploadv3?key={16位uid}/{文件名}
+           （Body 为文件原始内容，成功返回 "1"；≥90MB 走分片，本页不支持）
+           下载  https://s45.text-sync.com/{uid}/{文件名}
+           广播  服务器把 addFile/addFiles 统一转成 fileList（全量列表）发给
+                 所有人（含发送者），列表不按 id 去重（客户端自行去重）
+           删除 {"type":"removeFile","data":{id}} → 之后以 fileList 广播，
+                 且 s45 上的文件被真删除（撤下不可恢复）
+           注意：ready 只带 {name}，服务器不向迟到者回放文件列表，
+                 由教师端检测到新成员后用 addFiles 重发（maybeReplayFiles）
+     离场  {"type":"quit","data":"昵称"}（服务器在成员断开后广播）
+     CORS  api3 返回 Access-Control-Allow-Origin: *，本地双击打开可直接上传
+   扩展约定（纯前端解析，用户手打不出来，避免误判）：
+     \u200bA\u200b 开头 = 教师公告（置顶，不进消息流）
+     \u200bQ\u200b 开头 = 提问（橙色左边线 + 「问」标签）
+   ===================================================================== */
+
+/* ---------- 常量与全局状态 ---------- */
+var WS_HOST = "wss://api2.text-sync.com/api/room/";
+var FILE_UP = "https://api3.text-sync.com/wuploadv3?key=";
+var FILE_DL = "https://s45.text-sync.com/";
+var FILE_MAX = 80 * 1024 * 1024;   // 单文件上限 80MB（协议 ≥90MB 需分片，课堂场景不启用）
+var TEACHER_KEY = "1234";          // 教师口令（防误入，防不了有心人；可自行修改）
+var MARK_A = "\u200bA\u200b";      // 公告标记
+var MARK_Q = "\u200bQ\u200b";      // 提问标记
+var TEACHER_MARK = "\u2005";       // 教师名字前缀：四分之一空格（不可见，用于识别）
+var MAX_KEEP = 300;                // 本地最多保留的历史消息条数
+var SEND_GAP = 2000;               // 发送节流（毫秒）
+var DEFAULT_WORDS = "代考,代写,赌博,兼职刷单,加微信买";
+
+var S = {
+  room: "", name: "", isTeacher: false,
+  ws: null, wsOk: false, retry: 0, retryTimer: null, closedByUser: false,
+  members: {},                      // 名单（joined 加入，quit 移除）
+  msgs: [],                         // 本机历史 {name, text, time, type, mine}
+  notice: "",                       // 当前公告内容（本机缓存）
+  fileCache: {},                    // 房间文件缓存 id → {id,name,size,uid,username}（教师重发用）
+  replayedTo: {},                   // 公告重发记录（每次进房重置）
+  fileReplayedTo: {},               // 文件列表重发记录
+  msgType: "normal",                // normal | question
+  fontSize: 18,
+  lastSend: 0,
+  onlyQ: false,
+  filterOn: true,
+  words: DEFAULT_WORDS
+};
+
+var $ = function (id) { return document.getElementById(id); };
+
+/* ---------- 工具 ---------- */
+function esc(t) {
+  return String(t).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function hhmm(ts) {
+  var d = new Date(ts || Date.now());
+  return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+}
+function toast(t) {
+  var el = $("toast");
+  el.textContent = t;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.classList.remove("show"); }, 1800);
+}
+function isTeacherName(n) { return typeof n === "string" && n.indexOf(TEACHER_MARK) === 0; }
+function displayName(n) { return isTeacherName(n) ? n.slice(1) : n; }
+function stripMark(t) { return t.replace(/\u200b[QA]\u200b/g, ""); }
+function rand16() {
+  var s = "abcdefghijklmnopqrstuvwxyz0123456789", r = "";
+  for (var i = 0; i < 16; i++) r += s.charAt(Math.floor(Math.random() * s.length));
+  return r;
+}
+function fmtSize(n) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1073741824) return (n / 1048576).toFixed(1) + " MB";
+  return (n / 1073741824).toFixed(2) + " GB";
+}
+function loadLS() {
+  try {
+    S.fontSize = parseInt(localStorage.getItem("cr_font") || "18", 10) || 18;
+    var w = localStorage.getItem("cr_words");
+    if (w !== null) S.words = w;
+    S.filterOn = localStorage.getItem("cr_filter") !== "0";
+  } catch (e) {}
+}
+function saveLS() {
+  try {
+    localStorage.setItem("cr_font", String(S.fontSize));
+    localStorage.setItem("cr_words", S.words);
+    localStorage.setItem("cr_filter", S.filterOn ? "1" : "0");
+  } catch (e) {}
+}
+/* 敏感词过滤（只作用于发送内容） */
+function applyFilter(t) {
+  if (!S.filterOn || !S.words) return t;
+  var list = S.words.split(/[,，、\s]+/).filter(function (w) { return w.length > 0; });
+  for (var i = 0; i < list.length; i++) {
+    var w = list[i];
+    while (t.indexOf(w) >= 0) t = t.replace(w, "**");
+  }
+  return t;
+}
+
+/* ---------- 消息存储 ---------- */
+function loadHistory() {
+  try {
+    var raw = localStorage.getItem("cr_msg_" + S.room);
+    if (raw) S.msgs = JSON.parse(raw) || [];
+    for (var i = 0; i < S.msgs.length; i++) {
+      if (S.msgs[i].type === "file") S.msgs[i].uploading = false; // 上传中途退出的残留状态
+    }
+    var n = localStorage.getItem("cr_notice_" + S.room);
+    if (n) S.notice = n;
+  } catch (e) { S.msgs = []; }
+}
+function saveHistory() {
+  try {
+    if (S.msgs.length > MAX_KEEP) S.msgs = S.msgs.slice(-MAX_KEEP);
+    localStorage.setItem("cr_msg_" + S.room, JSON.stringify(S.msgs));
+    localStorage.setItem("cr_notice_" + S.room, S.notice || "");
+  } catch (e) {}
+}
+
+/* ---------- WebSocket ---------- */
+function connect() {
+  if (S.ws && (S.ws.readyState === 0 || S.ws.readyState === 1)) return;
+  updateDot();
+  var ws;
+  try { ws = new WebSocket(WS_HOST + encodeURIComponent(S.room) + "/websocket"); }
+  catch (e) { scheduleRetry(); return; }
+  S.ws = ws;
+
+  ws.onopen = function () {
+    S.wsOk = true; S.retry = 0;
+    ws.send(JSON.stringify({ type: "name", data: S.name }));
+    updateDot();
+  };
+  ws.onmessage = function (e) {
+    var m;
+    try { m = JSON.parse(e.data); } catch (err) { return; }
+    handleServerMsg(m);
+  };
+  ws.onclose = function () {
+    S.wsOk = false; S.ws = null;
+    updateDot();
+    if (!S.closedByUser) scheduleRetry();
+  };
+  ws.onerror = function () { /* onclose 会接手 */ };
+}
+function scheduleRetry() {
+  if (S.retryTimer || S.closedByUser) return;
+  var delay = Math.min(30000, 2000 * Math.pow(2, S.retry++));
+  $("conn-tip").textContent = "连接已断开，" + Math.round(delay / 1000) + " 秒后重连…";
+  $("conn-tip").classList.add("show");
+  S.retryTimer = setTimeout(function () {
+    S.retryTimer = null;
+    $("conn-tip").classList.remove("show");
+    connect();
+  }, delay);
+}
+function updateDot() {
+  var d = $("conn-dot");
+  d.className = "dot" + (S.wsOk ? " ok" : (S.ws ? "" : " bad"));
+}
+function safeSend(obj) {
+  if (S.ws && S.ws.readyState === 1) {
+    S.ws.send(JSON.stringify(obj));
+    return true;
+  }
+  toast("尚未连上服务器，稍候自动重试");
+  return false;
+}
+
+/* ---------- 服务器消息分发 ---------- */
+function handleServerMsg(m) {
+  if (m.type === "joined") {
+    if (m.data && !S.members[m.data]) {
+      S.members[m.data] = true;
+      renderMembers();
+      if (m.data !== S.name) addSysMsg(displayName(m.data) + (isTeacherName(m.data) ? "（老师）" : "") + " 加入了讨论");
+      maybeReplayNotice(m.data);
+      maybeReplayFiles(m.data);
+    }
+  } else if (m.type === "ready") {
+    if (m.data && Array.isArray(m.data.fileList)) syncFiles(m.data.fileList); // 房间现有文件（迟到者回放）
+    addSysMsg("已连接。注意：新加入看不到之前的消息，请看顶部公告");
+  } else if (m.type === "quit") {
+    var qn = typeof m.data === "string" ? m.data : (m.data && m.data.name);
+    if (qn && S.members[qn]) {
+      delete S.members[qn];
+      renderMembers();
+      addSysMsg(displayName(qn) + (isTeacherName(qn) ? "（老师）" : "") + " 离开了讨论");
+    }
+  } else if (m.type === "message") {
+    if (!m.data || typeof m.data.message !== "string") return;
+    var raw = m.data.message;
+    var name = m.data.name || "匿名";
+    var time = m.data.time || Date.now();
+
+    /* 教师公告 */
+    if (raw.indexOf(MARK_A) === 0) {
+      if (!isTeacherName(name)) return;         // 非教师发的公告标记直接丢弃
+      var fresh = stripMark(raw.slice(MARK_A.length));
+      var changed = fresh !== S.notice;
+      S.notice = fresh;
+      renderNotice(changed);                    // 内容相同（如教师重发）不重复弹提示
+      return;
+    }
+    /* 普通消息 / 提问 */
+    var type = raw.indexOf(MARK_Q) === 0 ? "question" : "normal";
+    var text = stripMark(raw);
+    if (!text.trim()) return;
+    pushMsg({ name: name, text: text, time: time, type: type, mine: false });
+  } else if (m.type === "addFile") {
+    var f = m.data;
+    if (f && f.id && f.name) pushMsg(fileToMsg(f));
+  } else if (m.type === "addFiles") {
+    if (Array.isArray(m.data)) syncFiles(m.data);
+  } else if (m.type === "fileList") {
+    /* 服务器把 addFile/addFiles 统一转成 fileList（全量列表）广播，含发送者本人 */
+    if (Array.isArray(m.data)) syncFiles(m.data);
+  } else if (m.type === "removeFile") {
+    var rid = m.data && m.data.id;
+    if (rid) removeFileCard(rid);
+  }
+}
+/* 服务器文件对象 → 本地消息对象 */
+function fileToMsg(f) {
+  return {
+    type: "file", mine: false, time: Date.now(),
+    name: f.username || "匿名",
+    file: { id: f.id, name: f.name, size: f.size || 0, uid: f.uid }
+  };
+}
+/* 房间文件列表对账：新增的入列；消失的延迟 2 秒确认后才撤卡
+   （教师重发文件列表时会先 removeFile 再 addFiles，立即撤卡会导致闪烁） */
+var fileRemoveTimers = {};
+function syncFiles(list) {
+  var ids = {};
+  for (var i = 0; i < list.length; i++) {
+    var f = list[i];
+    if (f && f.id && f.name) {
+      ids[f.id] = true;
+      S.fileCache[f.id] = { id: f.id, name: f.name, size: f.size || 0, uid: f.uid, username: f.username || "匿名" };
+      if (fileRemoveTimers[f.id]) { clearTimeout(fileRemoveTimers[f.id]); delete fileRemoveTimers[f.id]; }
+      pushMsg(fileToMsg(f), false);
+    }
+  }
+  for (var j = S.msgs.length - 1; j >= 0; j--) {
+    var m = S.msgs[j];
+    if (m.type === "file" && !m.uploading && !ids[m.file.id]) scheduleFileRemove(m.file.id);
+  }
+}
+function scheduleFileRemove(id) {
+  if (fileRemoveTimers[id]) return;
+  fileRemoveTimers[id] = setTimeout(function () {
+    delete fileRemoveTimers[id];
+    removeFileCard(id);
+  }, 2000);
+}
+/* 关键机制：服务器不向迟到者回放文件列表，且 addFiles 不按 id 去重
+   （列表会累积重复条目，客户端按 id 去重显示即可）。
+   注意不能用 removeFile 清理旧条目：removeFile 是真删除，会把 s45 上的
+   文件一并删掉（实测重发后 404）。所以教师端看到新成员加入后，
+   直接整体 addFiles 重发一次，迟到者约 1.2 秒后即可看到全部文件。
+   同一成员只触发一次。 */
+function maybeReplayFiles(name) {
+  if (!S.isTeacher || S.fileReplayedTo[name]) return;
+  var list = [];
+  for (var id in S.fileCache) list.push(S.fileCache[id]);
+  if (!list.length) return;
+  S.fileReplayedTo[name] = true;
+  setTimeout(function () {
+    if (S.ws && S.ws.readyState === 1) {
+      safeSend({ type: "addFiles", data: list });
+    }
+  }, 1200);
+}
+/* 撤下文件：从历史与消息流中移除 */
+function removeFileCard(id) {
+  delete S.fileCache[id];
+  for (var i = 0; i < S.msgs.length; i++) {
+    if (S.msgs[i].type === "file" && S.msgs[i].file && S.msgs[i].file.id === id) {
+      S.msgs.splice(i, 1);
+      saveHistory();
+      break;
+    }
+  }
+  var el = $("msg-list").querySelector('.msg[data-fid="' + id + '"]');
+  if (el) el.parentNode.removeChild(el);
+}
+
+/* ---------- 消息渲染 ---------- */
+function pushMsg(msg, skipSave) {
+  /* 去重：文件按 id 全量查（fileList 全量广播会反复携带旧文件）；
+     文本按 同名 + 同毫秒 + 同内容，查最近 8 条 */
+  var i, o;
+  if (msg.type === "file") {
+    for (i = 0; i < S.msgs.length; i++) {
+      if (S.msgs[i].type === "file" && S.msgs[i].file.id === msg.file.id) return;
+    }
+  } else {
+    var key = msg.name + "|" + msg.time + "|" + msg.text;
+    for (i = Math.max(0, S.msgs.length - 8); i < S.msgs.length; i++) {
+      o = S.msgs[i];
+      if (o.type !== "file" && o.name + "|" + o.time + "|" + o.text === key) return;
+    }
+  }
+  S.msgs.push(msg);
+  if (!skipSave) saveHistory();
+  renderMsg(msg);
+}
+function renderMsg(msg) {
+  if (S.onlyQ && msg.type !== "question") { applyOnlyQFilter(); return; }
+  var list = $("msg-list");
+  var div = document.createElement("div");
+  div.className = "msg" + (isTeacherName(msg.name) ? " is-t" : "") +
+                  (msg.mine ? " mine" : "") + (msg.type === "question" ? " is-q" : "");
+  if (msg.type === "file") div.setAttribute("data-fid", msg.file.id);
+  var initial = displayName(msg.name).slice(0, 1) || "?";
+  var icoSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+  var body;
+  if (msg.type === "file") {
+    body = fileCardHtml(msg.file, msg.uploading, icoSvg);
+  } else {
+    body = '<div class="bubble">' + esc(msg.text) + "</div>";
+  }
+  var html =
+    '<div class="avatar">' + esc(initial) + "</div>" +
+    '<div class="bubble-col">' +
+      '<div class="meta">' +
+        (isTeacherName(msg.name) ? '<span class="badge-t">师</span>' : "") +
+        "<span>" + esc(displayName(msg.name)) + (msg.mine ? "（我）" : "") + "</span>" +
+        (msg.type === "question" ? '<span class="badge-q">问</span>' : "") +
+        "<span>" + hhmm(msg.time) + "</span>" +
+      "</div>" + body +
+    "</div>" +
+    (msg.type === "file" ? "" : '<button class="pin-btn" type="button">上屏</button>');
+  div.innerHTML = html;
+
+  /* 教师可一键把学生发言引用上屏 */
+  var pin = div.querySelector(".pin-btn");
+  if (pin) {
+    pin.onclick = function () {
+      pinToScreen(displayName(msg.name), msg.text);
+    };
+  }
+
+  list.appendChild(div);
+  trimDom();
+  autoScroll();
+}
+/* 文件卡片 HTML（uploading=true 显示进度条） */
+function fileCardHtml(f, uploading, icoSvg) {
+  var dl = FILE_DL + f.uid + "/" + encodeURIComponent(f.name);
+  var inner;
+  if (uploading) {
+    inner =
+      '<div class="file-info">' +
+        '<div class="file-name">' + esc(f.name) + "</div>" +
+        '<div class="file-sub" data-role="pct">0%</div>' +
+        '<div class="fprog"><em data-role="bar"></em></div>' +
+      "</div>";
+  } else {
+    inner =
+      '<div class="file-info">' +
+        '<div class="file-name">' + esc(f.name) + "</div>" +
+        '<div class="file-sub">' + fmtSize(f.size) + " · 点击下载</div>" +
+      "</div>" +
+      '<a class="fbtn" href="' + dl + '" target="_blank" rel="noopener">下载</a>' +
+      (S.isTeacher ? '<button class="fdel" type="button">撤下</button>' : "");
+  }
+  return '<div class="file-card"><div class="file-ico">' + icoSvg + "</div>" + inner + "</div>";
+}
+function addSysMsg(text) {
+  var list = $("msg-list");
+  var div = document.createElement("div");
+  div.className = "sysmsg";
+  div.textContent = "— " + text + " —";
+  list.appendChild(div);
+  trimDom();
+  autoScroll();
+}
+function trimDom() {
+  var list = $("msg-list");
+  while (list.children.length > MAX_KEEP + 40) list.removeChild(list.firstChild);
+}
+function autoScroll() {
+  var list = $("msg-list");
+  /* 用户向上翻阅时不强制拉底 */
+  var nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 120;
+  if (nearBottom) list.scrollTop = list.scrollHeight;
+  else $("btn-bottom").classList.add("show");
+}
+function applyOnlyQFilter() {
+  var list = $("msg-list");
+  var items = list.querySelectorAll(".msg");
+  for (var i = 0; i < items.length; i++) {
+    var isQ = items[i].className.indexOf("is-q") >= 0;
+    items[i].style.display = (S.onlyQ && !isQ) ? "none" : "";
+  }
+}
+
+/* ---------- 公告 ---------- */
+/* 关键机制：服务器不保存房间状态，迟到者收不到之前发的公告。
+   所以教师端一旦看到新成员加入（joined），自动把当前公告重发一次，
+   迟到者入房约 1 秒后即可看到置顶公告。同一成员只重发一次。 */
+function maybeReplayNotice(name) {
+  if (!S.isTeacher || !S.notice) return;
+  if (S.replayedTo[name]) return;
+  S.replayedTo[name] = true;
+  setTimeout(function () {
+    if (S.ws && S.ws.readyState === 1) {
+      safeSend({ type: "message", data: { message: MARK_A + S.notice, time: Date.now() } });
+    }
+  }, 1000);
+}
+function renderNotice(alsoToast) {
+  var bar = $("notice-bar");
+  if (S.notice) {
+    $("notice-text").textContent = S.notice;
+    bar.classList.add("show");
+    bar.classList.remove("folded");
+    $("notice-fold").textContent = "收起";
+    if (alsoToast) toast("收到新公告");
+  } else {
+    bar.classList.remove("show");
+  }
+}
+function pinToScreen(name, text) {
+  var content = "【上屏】" + name + "：" + text;
+  if (content.length > 280) content = content.slice(0, 280) + "…";
+  if (safeSend({ type: "message", data: { message: MARK_A + content, time: Date.now() } })) {
+    toast("已上屏到公告区");
+  }
+}
+
+/* ---------- 成员 ---------- */
+function renderMembers() {
+  var names = Object.keys(S.members);
+  $("tb-members").textContent = "成员 " + names.length;
+  var box = $("member-list");
+  box.innerHTML = "";
+  names.sort(function (a, b) {
+    return (isTeacherName(b) ? 1 : 0) - (isTeacherName(a) ? 1 : 0);
+  });
+  for (var i = 0; i < names.length; i++) {
+    var row = document.createElement("div");
+    row.className = "mrow" + (isTeacherName(names[i]) ? " is-t" : "");
+    row.textContent = displayName(names[i]) + (isTeacherName(names[i]) ? "（老师）" : "") +
+                      (names[i] === S.name ? "（我）" : "");
+    box.appendChild(row);
+  }
+}
+
+/* ---------- 进房流程 ---------- */
+/* 教师端拆分版：固定教师身份，无需选择 */
+var pickTeacher = true;
+function bindJoin() {
+  $("btn-join").onclick = doJoin;
+  $("in-key").addEventListener("keydown", function (e) { if (e.key === "Enter") doJoin(); });
+  $("in-name").addEventListener("keydown", function (e) { if (e.key === "Enter") doJoin(); });
+  $("in-room").addEventListener("keydown", function (e) { if (e.key === "Enter") $("in-name").focus(); });
+
+  /* URL 参数直达：?room=a1b2c&name=张三 */
+  var q = new URLSearchParams(location.search);
+  if (q.get("room")) $("in-room").value = q.get("room").replace(/[^a-zA-Z0-9]/g, "").slice(0, 5);
+  if (q.get("name")) $("in-name").value = q.get("name").slice(0, 12);
+}
+function doJoin() {
+  var room = $("in-room").value.trim().replace(/[^a-zA-Z0-9]/g, "");
+  var name = $("in-name").value.trim();
+  var err = $("join-err");
+  err.textContent = "";
+  if (!/^[a-zA-Z0-9]{5}$/.test(room)) { err.textContent = "房间号必须是 5 位字母或数字"; return; }
+  if (!name) { err.textContent = "请填写名字"; return; }
+  if (pickTeacher && $("in-key").value !== TEACHER_KEY) { err.textContent = "教师口令不正确"; return; }
+
+  S.room = room;
+  S.isTeacher = pickTeacher;
+  S.name = pickTeacher ? (TEACHER_MARK + name) : name;   // 教师名加不可见前缀，全班可识别
+  S.replayedTo = {};                                     // 公告重发记录（每次进房重置）
+  S.fileReplayedTo = {};                                 // 文件重发记录
+  S.fileCache = {};                                      // 文件缓存（进房后由 fileList 对账重建）
+  try { localStorage.setItem("cr_name", name); } catch (e) {}
+
+  $("view-join").style.display = "none";
+  $("view-room").style.display = "flex";
+  if (S.isTeacher) {
+    document.body.classList.add("is-teacher");
+    $("notice-edit").classList.add("show");
+  }
+  $("tb-room-id").textContent = room;
+  loadHistory();
+  /* 用本机历史回填文件缓存（教师刷新页面后仍能重发文件列表） */
+  for (var fi = 0; fi < S.msgs.length; fi++) {
+    var fm = S.msgs[fi];
+    if (fm.type === "file" && fm.file && !S.fileCache[fm.file.id]) {
+      S.fileCache[fm.file.id] = {
+        id: fm.file.id, name: fm.file.name, size: fm.file.size,
+        uid: fm.file.uid, username: displayName(fm.name)
+      };
+    }
+  }
+  renderNotice(false);
+  S.members = {};
+  S.members[S.name] = true;
+  renderMembers();
+  /* 回放本机历史 */
+  for (var i = 0; i < S.msgs.length; i++) renderMsg(S.msgs[i]);
+  addSysMsg("房间号 " + room + "，把页面发给同学即可加入");
+  connect();
+}
+
+/* ---------- 发送 ---------- */
+function bindRoom() {
+  var input = $("msg-input");
+
+  /* 类型切换 */
+  $("type-normal").onclick = function () {
+    S.msgType = "normal";
+    this.classList.add("on");
+    $("type-question").classList.remove("on-q");
+    input.placeholder = "想好再发，点击「发送」或按 Ctrl+Enter";
+  };
+  $("type-question").onclick = function () {
+    S.msgType = "question";
+    this.classList.add("on-q");
+    $("type-normal").classList.remove("on");
+    input.placeholder = "输入你的问题，老师会优先看到";
+  };
+
+  input.addEventListener("input", function () { $("char-num").textContent = input.value.length; });
+  input.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); sendMsg(); }
+  });
+  $("btn-send").onclick = sendMsg;
+
+  /* 文件发送 */
+  $("btn-file").onclick = function () { $("file-in").click(); };
+  $("file-in").onchange = function () {
+    if (this.files && this.files[0]) sendFile(this.files[0]);
+    this.value = "";
+  };
+  /* 教师撤下文件（事件委托，卡片重渲染后依然有效） */
+  $("msg-list").addEventListener("click", function (e) {
+    var d = e.target.closest ? e.target.closest(".fdel") : null;
+    if (!d) return;
+    var card = d.closest(".msg[data-fid]");
+    if (!card) return;
+    var fid = card.getAttribute("data-fid");
+    if (!confirm("撤下后所有人都无法再下载这个文件，确定？")) return;
+    if (safeSend({ type: "removeFile", data: { id: fid } })) removeFileCard(fid);
+  });
+
+  /* 字号 */
+  $("fs-plus").onclick = function () { setFont(S.fontSize + 2); };
+  $("fs-minus").onclick = function () { setFont(S.fontSize - 2); };
+  $("fs-reset").onclick = function () { setFont(18); };
+
+  /* 只看提问 */
+  $("btn-onlyq").onclick = function () {
+    S.onlyQ = !S.onlyQ;
+    this.classList.toggle("on", S.onlyQ);
+    applyOnlyQFilter();
+  };
+
+  /* 公告 */
+  $("btn-notice-send").onclick = function () {
+    var t = $("notice-input").value.trim();
+    if (!t) { toast("公告内容不能为空"); return; }
+    if (safeSend({ type: "message", data: { message: MARK_A + t, time: Date.now() } })) {
+      S.notice = t;
+      renderNotice(false);
+      $("notice-input").value = "";
+      toast("公告已发布");
+    }
+  };
+  $("btn-notice-clear").onclick = function () {
+    if (!S.notice) { toast("当前没有公告"); return; }
+    if (safeSend({ type: "message", data: { message: MARK_A, time: Date.now() } })) {
+      S.notice = "";
+      renderNotice(false);
+      toast("公告已撤下");
+    }
+  };
+  $("notice-fold").onclick = function () {
+    var bar = $("notice-bar");
+    bar.classList.toggle("folded");
+    this.textContent = bar.classList.contains("folded") ? "展开" : "收起";
+  };
+
+  /* 导出 / 清屏 */
+  $("btn-export").onclick = function () {
+    if (!S.msgs.length) { toast("还没有可导出的消息"); return; }
+    var lines = ["课堂讨论记录  房间 " + S.room, "导出时间 " + new Date().toLocaleString(), ""];
+    for (var i = 0; i < S.msgs.length; i++) {
+      var m = S.msgs[i];
+      var head = "[" + new Date(m.time).toLocaleTimeString() + "] " + displayName(m.name) + " ";
+      if (m.type === "file") lines.push(head + "[文件]：" + m.file.name + "（" + fmtSize(m.file.size) + "）");
+      else {
+        var tag = m.type === "question" ? "[提问]" : (isTeacherName(m.name) ? "[教师]" : "");
+        lines.push(head + tag + "：" + m.text);
+      }
+    }
+    if (S.notice) lines.unshift("【公告】" + S.notice, "");
+    var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/plain;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "讨论记录-" + S.room + "-" + hhmm(Date.now()).replace(":", "") + ".txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $("btn-clear").onclick = function () {
+    if (!confirm("清屏只清空本机显示和本机记录，其他同学不受影响。确定清屏？")) return;
+    S.msgs = [];
+    saveHistory();
+    $("msg-list").innerHTML = "";
+    addSysMsg("屏幕已清空");
+  };
+
+  /* 成员浮层 */
+  $("tb-members").onclick = function (e) {
+    var pop = $("member-pop");
+    var open = pop.style.display === "block";
+    pop.style.display = open ? "none" : "block";
+    if (!open) e.stopPropagation();
+  };
+  document.addEventListener("click", function (e) {
+    var pop = $("member-pop");
+    if (pop.style.display === "block" && !pop.contains(e.target) && e.target.id !== "tb-members") {
+      pop.style.display = "none";
+    }
+  });
+
+  /* 回到底部 */
+  $("btn-bottom").onclick = function () {
+    var list = $("msg-list");
+    list.scrollTop = list.scrollHeight;
+    this.classList.remove("show");
+  };
+  $("msg-list").addEventListener("scroll", function () {
+    if (this.scrollHeight - this.scrollTop - this.clientHeight < 120) {
+      $("btn-bottom").classList.remove("show");
+    }
+  });
+
+  /* 设置 */
+  $("btn-settings").onclick = function () {
+    $("st-words").value = S.words;
+    $("st-filter-on").checked = S.filterOn;
+    $("settings-mask").classList.add("show");
+  };
+  $("st-cancel").onclick = function () { $("settings-mask").classList.remove("show"); };
+  $("st-save").onclick = function () {
+    S.words = $("st-words").value.trim();
+    S.filterOn = $("st-filter-on").checked;
+    saveLS();
+    $("settings-mask").classList.remove("show");
+    toast("设置已保存（仅本机生效）");
+  };
+  $("settings-mask").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("show");
+  });
+}
+function setFont(px) {
+  S.fontSize = Math.max(14, Math.min(30, px));
+  document.documentElement.style.setProperty("--msg-size", S.fontSize + "px");
+  saveLS();
+}
+function sendMsg() {
+  var input = $("msg-input");
+  var text = input.value.trim();
+  if (!text) { toast("先输入内容再发送"); return; }
+  var now = Date.now();
+  if (now - S.lastSend < SEND_GAP) {
+    toast("发送太频繁，休息 " + Math.ceil((SEND_GAP - (now - S.lastSend)) / 1000) + " 秒");
+    return;
+  }
+  var payload = S.msgType === "question" ? (MARK_Q + text) : text;
+  payload = applyFilter(payload);
+  if (!payload.replace(MARK_Q, "").trim()) { toast("内容已被敏感词全部过滤"); return; }
+  if (!safeSend({ type: "message", data: { message: payload, time: now } })) return;
+  S.lastSend = now;
+  /* 本机立即回显（服务器不会把消息发回给发送者本人） */
+  pushMsg({
+    name: S.name, text: text, time: now,
+    type: S.msgType === "question" ? "question" : "normal", mine: true
+  });
+  input.value = "";
+  $("char-num").textContent = "0";
+  input.focus();
+}
+
+/* ---------- 文件上传 ---------- */
+function sendFile(file) {
+  if (!file) return;
+  if (file.size > FILE_MAX) { toast("文件超过 80MB，暂不支持"); return; }
+  if (!S.ws || S.ws.readyState !== 1) { toast("尚未连上服务器，稍候再试"); return; }
+  var uid = rand16(), id = rand16();
+  var msg = {
+    type: "file", mine: true, uploading: true, time: Date.now(), name: S.name,
+    file: { id: id, name: file.name, size: file.size, uid: uid }
+  };
+  pushMsg(msg);
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("PUT", FILE_UP + encodeURIComponent(uid + "/" + file.name));
+  xhr.upload.onprogress = function (e) {
+    if (!e.lengthComputable) return;
+    var pct = Math.round(e.loaded / e.total * 100);
+    var el = $("msg-list").querySelector('.msg[data-fid="' + id + '"]');
+    if (!el) return;
+    var p = el.querySelector('[data-role="pct"]'), b = el.querySelector('[data-role="bar"]');
+    if (p) p.textContent = pct + "%";
+    if (b) b.style.width = pct + "%";
+  };
+  xhr.onload = function () {
+    /* 服务器成功时返回 "1" 或空串（与 TextSync 前端判定一致） */
+    if (xhr.status >= 200 && xhr.status < 300 && (xhr.responseText === "" || xhr.responseText === "1")) {
+      msg.uploading = false;
+      saveHistory();
+      var el = $("msg-list").querySelector('.msg[data-fid="' + id + '"]');
+      if (el) {
+        var card = el.querySelector(".file-card");
+        if (card) card.outerHTML = fileCardHtml(msg.file, false, card.querySelector(".file-ico").innerHTML);
+      }
+      safeSend({ type: "addFile", data: { id: id, name: file.name, size: file.size, uid: uid, status: "success", username: S.name } });
+      toast("文件发送成功");
+    } else {
+      removeFileCard(id);
+      toast("上传失败（" + xhr.status + "）");
+    }
+  };
+  xhr.onerror = function () { removeFileCard(id); toast("上传失败，请检查网络"); };
+  xhr.ontimeout = function () { removeFileCard(id); toast("上传超时"); };
+  xhr.send(file);
+}
+
+/* ---------- 启动 ---------- */
+loadLS();
+document.documentElement.style.setProperty("--msg-size", S.fontSize + "px");
+bindJoin();
+bindRoom();
+/* 恢复上次昵称 */
+try {
+  var last = localStorage.getItem("cr_name");
+  if (last) $("in-name").value = last;
+} catch (e) {}
+/* 页面重新可见时立即尝试重连 */
+document.addEventListener("visibilitychange", function () {
+  if (!document.hidden && S.room && !S.wsOk) { S.retry = 0; connect(); }
+});
+</script>
+</body>
+</html>
