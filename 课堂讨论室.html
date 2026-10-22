@@ -1802,6 +1802,8 @@ function sendMsg() {
   input.value = "";
   $("char-num").textContent = "0";
   updatePreview();
+  var list = $("msg-list");
+  list.scrollTop = list.scrollHeight;   // 自己发言后必滚到底，翻看历史时也能立刻看到自己
   input.focus();
 }
 
