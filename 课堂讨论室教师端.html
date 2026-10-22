@@ -169,12 +169,19 @@
   }
   #n-preview.show { display: block; }
 
-  /* 发言搜索条（默认隐藏，点工具栏「搜索」展开） */
-  #search-bar {
-    flex: none; display: none; gap: 8px; align-items: center; padding: 6px 12px;
+  /* 筛选条（分类查看 + 关键词搜索，默认隐藏，点工具栏「筛选」展开） */
+  #filter-bar {
+    flex: none; display: none; flex-direction: column; gap: 6px; padding: 6px 12px;
     background: #f8fafc; border-bottom: 1px solid var(--line);
   }
-  #search-bar.show { display: flex; }
+  #filter-bar.show { display: flex; }
+  .seg-row { display: flex; gap: 6px; }
+  .seg-btn {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    border-radius: 999px; padding: 3px 12px; font-size: 12px;
+  }
+  .seg-btn.on { background: var(--warn); border-color: var(--warn); color: #fff; }
+  .srch-row { display: flex; gap: 8px; align-items: center; }
   #srch-input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; background: #fff; }
   #srch-input:focus { outline: none; border-color: var(--warn); }
   #srch-count { flex: none; font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -473,8 +480,7 @@
       <button class="fs-btn" id="fs-plus" type="button">A+</button>
       <button class="fs-btn" id="fs-reset" type="button">重置</button>
     </div>
-    <button class="tb-btn" id="btn-onlyq" type="button" title="只看教师提问与学生回答">只看问答</button>
-    <button class="tb-btn" id="btn-search" type="button" title="按关键词搜索发言，多个词用空格隔开">搜索</button>
+    <button class="tb-btn" id="btn-filter" type="button" title="分类查看（问答/文件/图片）与关键词搜索">筛选</button>
     <button class="tb-btn" id="btn-settings" type="button">设置</button>
     <button class="tb-btn" id="btn-export" type="button">导出</button>
     <button class="tb-btn" id="btn-clear" type="button">清屏</button>
@@ -506,11 +512,19 @@
     </div>
   </div>
 
-  <!-- 发言搜索条 -->
-  <div id="search-bar">
-    <input id="srch-input" type="text" placeholder="搜索发言，多个关键词用空格隔开" maxlength="50">
-    <span id="srch-count"></span>
-    <button id="srch-close" type="button" title="关闭搜索">✕</button>
+  <!-- 筛选条：分类查看 + 关键词搜索 -->
+  <div id="filter-bar">
+    <div class="seg-row">
+      <button class="seg-btn on" id="seg-all" type="button">全部</button>
+      <button class="seg-btn" id="seg-qa" type="button">问答</button>
+      <button class="seg-btn" id="seg-file" type="button">文件</button>
+      <button class="seg-btn" id="seg-img" type="button">图片</button>
+    </div>
+    <div class="srch-row">
+      <input id="srch-input" type="text" placeholder="搜索发言，多个关键词用空格隔开" maxlength="50">
+      <span id="srch-count"></span>
+      <button id="srch-close" type="button" title="关闭筛选">✕</button>
+    </div>
   </div>
 
   <!-- 消息流 -->
@@ -649,7 +663,7 @@ var S = {
   noticeColor: "",                  // 当前公告颜色（"" = 默认）
   fontSize: 18,
   lastSend: 0,
-  onlyQ: false,
+  filter: "",          // 分类筛选："" 全部 | "qa" 问答 | "file" 文件 | "img" 图片
   filterOn: true,
   words: DEFAULT_WORDS
 };
@@ -1120,7 +1134,7 @@ function renderMsg(msg) {
      （教师端/学生端页面在同一浏览器共用 localStorage 历史，存的 mine 会互相污染） */
   var mine = msg.name === S.name;
   var isT = isTeacherName(msg.name);
-  if (S.onlyQ && !((isT && msg.type === "question") || msg.type === "answer")) { applyOnlyQFilter(); return; }
+  if (S.filter === "qa" && !((isT && msg.type === "question") || msg.type === "answer")) { applyOnlyQFilter(); return; }
   var list = $("msg-list");
   var div = document.createElement("div");
   div.className = "msg" + (isT ? " is-t" : "") +
@@ -1187,7 +1201,7 @@ function renderMsg(msg) {
 
   list.appendChild(div);
   trimDom();
-  if (S.searchQ) applyOnlyQFilter();   // 搜索激活时新消息立即参与过滤
+  if (S.searchQ || S.filter) applyOnlyQFilter();   // 筛选/搜索激活时新消息立即参与过滤
   autoScroll();
 }
 /* 文件卡片 HTML（uploading=true 显示进度条） */
@@ -1351,16 +1365,18 @@ function autoScroll() {
   else $("btn-bottom").classList.add("show");
 }
 function applyOnlyQFilter() {
-  /* 统一过滤：只看问答 + 关键词搜索（多词空格分隔 AND 联合，对纯文本模糊匹配），同时启用取交集 */
+  /* 统一过滤：分类查看（问答/文件/图片）+ 关键词搜索（多词空格分隔 AND 联合），同时启用取交集 */
   var list = $("msg-list");
   var items = list.querySelectorAll(".msg");
   var kws = (S.searchQ || "").toLowerCase().split(/\s+/).filter(Boolean);
   var n = 0;
   for (var i = 0; i < items.length; i++) {
     var cn = items[i].className;
-    /* 只看问答：教师的提问 + 所有人的回答 */
-    var qa = (cn.indexOf("is-t") >= 0 && cn.indexOf("is-q") >= 0) || cn.indexOf("is-a") >= 0;
-    var ok = !S.onlyQ || qa;
+    /* 分类查看：问答=教师提问+所有人回答；文件/图片按卡片标识识别 */
+    var ok = true;
+    if (S.filter === "qa") ok = (cn.indexOf("is-t") >= 0 && cn.indexOf("is-q") >= 0) || cn.indexOf("is-a") >= 0;
+    else if (S.filter === "file") ok = !!items[i].querySelector(".file-card");
+    else if (S.filter === "img") ok = !!items[i].querySelector("a.lb-link");
     if (ok && kws.length) {
       var b = items[i].querySelector(".bubble");
       if (!b) ok = false;                              // 文件 / 图片消息不参与文本搜索
@@ -1761,35 +1777,34 @@ function bindRoom() {
   $("fs-minus").onclick = function () { setFont(S.fontSize - 2); };
   $("fs-reset").onclick = function () { setFont(18); };
 
-  /* 只看提问 */
-  $("btn-onlyq").onclick = function () {
-    S.onlyQ = !S.onlyQ;
-    this.classList.toggle("on", S.onlyQ);
+  /* 筛选条：分类查看（全部/问答/文件/图片）+ 关键词搜索，输入即过滤（applyOnlyQFilter 统一处理） */
+  $("btn-filter").onclick = function () {
+    $("filter-bar").classList.toggle("show");
+    if ($("filter-bar").classList.contains("show")) $("srch-input").focus();
+  };
+  function setSeg(f) {
+    $("seg-all").classList.toggle("on", !f);
+    $("seg-qa").classList.toggle("on", f === "qa");
+    $("seg-file").classList.toggle("on", f === "file");
+    $("seg-img").classList.toggle("on", f === "img");
+  }
+  function closeFilter() {
+    $("filter-bar").classList.remove("show");
+    $("srch-input").value = "";
+    S.searchQ = "";
+    S.filter = "";
+    setSeg("");
     applyOnlyQFilter();
-  };
-
-  /* 搜索发言：工具栏按钮展开/收起搜索条，输入即过滤（applyOnlyQFilter 统一处理） */
-  $("btn-search").onclick = function () {
-    var bar = $("search-bar");
-    bar.classList.toggle("show");
-    if (bar.classList.contains("show")) {
-      $("srch-input").focus();
-    } else {
-      $("srch-input").value = "";
-      S.searchQ = "";
-      applyOnlyQFilter();
-    }
-  };
+  }
+  $("seg-all").onclick = function () { S.filter = ""; setSeg(""); applyOnlyQFilter(); };
+  $("seg-qa").onclick = function () { S.filter = "qa"; setSeg("qa"); applyOnlyQFilter(); };
+  $("seg-file").onclick = function () { S.filter = "file"; setSeg("file"); applyOnlyQFilter(); };
+  $("seg-img").onclick = function () { S.filter = "img"; setSeg("img"); applyOnlyQFilter(); };
   $("srch-input").addEventListener("input", function () {
     S.searchQ = this.value.trim();
     applyOnlyQFilter();
   });
-  $("srch-close").onclick = function () {
-    $("search-bar").classList.remove("show");
-    $("srch-input").value = "";
-    S.searchQ = "";
-    applyOnlyQFilter();
-  };
+  $("srch-close").onclick = closeFilter;
 
   /* 公告（教师：显示/编辑两态，发布或撤下后自动回到显示模式） */
   $("btn-notice-edit").onclick = function () {
