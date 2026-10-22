@@ -138,7 +138,8 @@
     border-radius: 6px; padding: 2px 7px; margin-top: 2px;
   }
   #notice-text { flex: 1; font-size: var(--msg-size); line-height: 1.55; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
-  #notice-fold { flex: none; background: none; color: var(--muted); font-size: 12px; padding: 4px; }
+  #notice-fold, #btn-notice-edit { flex: none; background: none; color: var(--muted); font-size: 12px; padding: 4px; }
+  #notice-bar.empty #notice-text { color: var(--muted); font-weight: 400; }
   #notice-bar.folded #notice-text { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 
   /* 教师公告编辑 */
@@ -471,6 +472,7 @@
     <span class="n-tag">公告</span>
     <div id="notice-text"></div>
     <button id="notice-fold" type="button">收起</button>
+    <button id="btn-notice-edit" type="button" title="编辑公告">✏️</button>
   </div>
 
   <!-- 公告实时预览条（位于编辑条上方） -->
@@ -487,6 +489,7 @@
     <div class="ne-col">
       <button class="ne-btn" id="btn-notice-send" type="button">发布公告</button>
       <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
+      <button class="ne-btn gray" id="btn-notice-cancel" type="button">取消编辑</button>
     </div>
   </div>
 
@@ -1353,11 +1356,31 @@ function maybeReplayNotice(name) {
   }, 1000);
 }
 function renderNotice(alsoToast) {
-  /* 教师：公告显示与编辑合并为同一个文本框（编辑框内容即当前公告，节约空间）；
+  /* 教师：公告显示/编辑两态切换（✏️ 进入源码编辑，发布/撤下/取消回到显示）；
      学生：仍走置顶公告条 */
   if (S.isTeacher) {
+    /* 显示/编辑两态：编辑条展开时隐藏公告条；平时公告条以渲染效果常驻（点 ✏️ 进入源码编辑） */
     var ta = $("notice-input");
-    if (document.activeElement !== ta) ta.value = S.notice; // 正在输入时不覆盖
+    var editing = $("notice-edit").classList.contains("show");
+    var nbar = $("notice-bar");
+    if (editing) {
+      nbar.classList.remove("show");
+      if (document.activeElement !== ta) ta.value = S.notice; // 正在输入时不覆盖
+    } else if (S.notice) {
+      nbar.classList.add("show");
+      nbar.classList.remove("empty");
+      nbar.classList.remove("folded");
+      $("notice-fold").textContent = "收起";
+      $("notice-text").innerHTML = renderRich(S.notice);   // 渲染富文本效果（renderRich 先 esc 防注入）
+      $("notice-text").style.color = S.noticeColor || "";
+    } else {
+      nbar.classList.add("show");
+      nbar.classList.add("empty");
+      nbar.classList.remove("folded");
+      $("notice-fold").textContent = "收起";
+      $("notice-text").textContent = "暂无公告，点右侧 ✏️ 编辑";
+      $("notice-text").style.color = "";
+    }
     ta.style.color = S.noticeColor || "";
     setDot($("btn-notice-color"), S.noticeColor || "");
     if (alsoToast) toast(S.notice ? "收到新公告" : "公告已被撤下");
@@ -1439,8 +1462,7 @@ function doJoin() {
   $("view-join").style.display = "none";
   $("view-room").style.display = "flex";
   if (S.isTeacher) {
-    document.body.classList.add("is-teacher");
-    $("notice-edit").classList.add("show");
+    document.body.classList.add("is-teacher");   // 公告默认显示模式，由 renderNotice 控制
   }
   $("tb-room-id").textContent = room;
   loadHistory();
@@ -1653,14 +1675,27 @@ function bindRoom() {
     applyOnlyQFilter();
   };
 
-  /* 公告（教师：编辑框即显示框，发布后保留内容） */
+  /* 公告（教师：显示/编辑两态，发布或撤下后自动回到显示模式） */
+  $("btn-notice-edit").onclick = function () {
+    $("notice-edit").classList.add("show");
+    renderNotice(false);                       // 隐藏公告条并回填当前公告源码
+    var ta = $("notice-input");
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    updateNoticePreview();
+  };
+  function exitNoticeEdit() {
+    $("notice-edit").classList.remove("show");
+    $("n-preview").classList.remove("show");
+    renderNotice(false);
+  }
   $("btn-notice-send").onclick = function () {
     var t = $("notice-input").value.trim();
     if (!t) { toast("公告内容不能为空"); return; }
     var npre = S.noticeColor ? ("\u200bC" + S.noticeColor + "\u200b") : "";
     if (safeSend({ type: "message", data: { message: MARK_A + npre + t, time: Date.now() } })) {
       S.notice = t;
-      renderNotice(false);
+      exitNoticeEdit();
       toast("公告已发布");
     }
   };
@@ -1671,11 +1706,11 @@ function bindRoom() {
       S.noticeColor = "";
       $("notice-input").style.color = "";
       setDot($("btn-notice-color"), "");
-      renderNotice(false);
-      updateNoticePreview();
+      exitNoticeEdit();
       toast("公告已撤下");
     }
   };
+  $("btn-notice-cancel").onclick = exitNoticeEdit;
   $("notice-fold").onclick = function () {
     var bar = $("notice-bar");
     bar.classList.toggle("folded");
