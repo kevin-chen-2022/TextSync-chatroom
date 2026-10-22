@@ -1417,8 +1417,21 @@ function bindRoom() {
   togglePop($("btn-color"), "pop-color");
   togglePop($("btn-notice-emoji"), "n-pop-emoji");
   togglePop($("btn-notice-color"), "n-pop-color");
-  /* 从其他程序粘贴：剪贴板带 text/html 时提取颜色转为包裹标记 */
+  /* 从其他程序粘贴：带图片时确认后走发图链路；带 text/html 时提取颜色转为包裹标记 */
   input.addEventListener("paste", function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (items) {
+      for (var pi = 0; pi < items.length; pi++) {
+        if (items[pi].type && items[pi].type.indexOf("image/") === 0) {
+          var pf = items[pi].getAsFile();
+          if (pf && confirm("检测到剪贴板中的图片，发送到讨论室？")) {
+            e.preventDefault();
+            sendImage(pf);
+          }
+          break;                                   // 只处理首个图片项；取消则继续走下方文本粘贴
+        }
+      }
+    }
     var html = e.clipboardData && e.clipboardData.getData ? e.clipboardData.getData("text/html") : "";
     if (!html) return;                         // 无富文本：默认纯文本粘贴
     var conv = htmlToMarks(html);
