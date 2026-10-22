@@ -162,6 +162,18 @@
   }
   #n-preview.show { display: block; }
 
+  /* 发言搜索条（默认隐藏，点工具栏「搜索」展开） */
+  #search-bar {
+    flex: none; display: none; gap: 8px; align-items: center; padding: 6px 12px;
+    background: #f8fafc; border-bottom: 1px solid var(--line);
+  }
+  #search-bar.show { display: flex; }
+  #srch-input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; background: #fff; }
+  #srch-input:focus { outline: none; border-color: var(--warn); }
+  #srch-count { flex: none; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  #srch-close { flex: none; background: none; color: var(--muted); font-size: 14px; padding: 4px 6px; }
+  mark.srch { background: #fff176; color: inherit; border-radius: 2px; padding: 0 1px; }
+
   /* 消息流 */
   #msg-wrap { flex: 1; position: relative; overflow: hidden; }
   #msg-list {
@@ -448,6 +460,7 @@
       <button class="fs-btn" id="fs-reset" type="button">重置</button>
     </div>
     <button class="tb-btn" id="btn-onlyq" type="button" title="只看教师提问与学生回答">只看问答</button>
+    <button class="tb-btn" id="btn-search" type="button" title="按关键词搜索发言，多个词用空格隔开">搜索</button>
     <button class="tb-btn" id="btn-settings" type="button">设置</button>
     <button class="tb-btn" id="btn-export" type="button">导出</button>
     <button class="tb-btn" id="btn-clear" type="button">清屏</button>
@@ -475,6 +488,13 @@
       <button class="ne-btn" id="btn-notice-send" type="button">发布公告</button>
       <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
     </div>
+  </div>
+
+  <!-- 发言搜索条 -->
+  <div id="search-bar">
+    <input id="srch-input" type="text" placeholder="搜索发言，多个关键词用空格隔开" maxlength="50">
+    <span id="srch-count"></span>
+    <button id="srch-close" type="button" title="关闭搜索">✕</button>
   </div>
 
   <!-- 消息流 -->
@@ -1151,6 +1171,7 @@ function renderMsg(msg) {
 
   list.appendChild(div);
   trimDom();
+  if (S.searchQ) applyOnlyQFilter();   // 搜索激活时新消息立即参与过滤
   autoScroll();
 }
 /* 文件卡片 HTML（uploading=true 显示进度条） */
@@ -1314,13 +1335,85 @@ function autoScroll() {
   else $("btn-bottom").classList.add("show");
 }
 function applyOnlyQFilter() {
+  /* 统一过滤：只看问答 + 关键词搜索（多词空格分隔 AND 联合，对纯文本模糊匹配），同时启用取交集 */
   var list = $("msg-list");
   var items = list.querySelectorAll(".msg");
+  var kws = (S.searchQ || "").toLowerCase().split(/\s+/).filter(Boolean);
+  var n = 0;
   for (var i = 0; i < items.length; i++) {
     var cn = items[i].className;
     /* 只看问答：教师的提问 + 所有人的回答 */
     var qa = (cn.indexOf("is-t") >= 0 && cn.indexOf("is-q") >= 0) || cn.indexOf("is-a") >= 0;
-    items[i].style.display = (S.onlyQ && !qa) ? "none" : "";
+    var ok = !S.onlyQ || qa;
+    if (ok && kws.length) {
+      var b = items[i].querySelector(".bubble");
+      if (!b) ok = false;                              // 文件 / 图片消息不参与文本搜索
+      else {
+        var txt = b.textContent.toLowerCase();
+        for (var j = 0; j < kws.length; j++) {
+          if (txt.indexOf(kws[j]) < 0) { ok = false; break; }
+        }
+      }
+    }
+    items[i].style.display = ok ? "" : "none";
+    if (ok) n++;
+  }
+  var cnt = $("srch-count");
+  if (cnt) cnt.textContent = kws.length ? "匹配 " + n + " 条" : "";
+  highlightMatches(kws);
+}
+/* 搜索高亮：只处理文本节点（TreeWalker），不碰标签结构，无注入风险 */
+function findMarks(low, kws) {
+  var out = [], j, from, p;
+  for (j = 0; j < kws.length; j++) {
+    from = 0;
+    while ((p = low.indexOf(kws[j], from)) >= 0) {
+      out.push({ start: p, len: kws[j].length });
+      from = p + kws[j].length;
+    }
+  }
+  out.sort(function (a, b) { return a.start - b.start; });
+  var res = [], lastEnd = -1;
+  for (j = 0; j < out.length; j++) {
+    if (out[j].start >= lastEnd) { res.push(out[j]); lastEnd = out[j].start + out[j].len; }
+  }
+  return res;
+}
+function highlightNode(root, kws) {
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  var nodes = [], nd, i;
+  while ((nd = walker.nextNode())) nodes.push(nd);
+  for (i = 0; i < nodes.length; i++) {
+    var t = nodes[i].nodeValue;
+    if (!t || !t.trim()) continue;
+    var marks = findMarks(t.toLowerCase(), kws);
+    if (!marks.length) continue;
+    var frag = document.createDocumentFragment(), pos = 0, k;
+    for (k = 0; k < marks.length; k++) {
+      if (marks[k].start > pos) frag.appendChild(document.createTextNode(t.slice(pos, marks[k].start)));
+      var m = document.createElement("mark");
+      m.className = "srch";
+      m.textContent = t.substr(marks[k].start, marks[k].len);
+      frag.appendChild(m);
+      pos = marks[k].start + marks[k].len;
+    }
+    if (pos < t.length) frag.appendChild(document.createTextNode(t.slice(pos)));
+    nodes[i].parentNode.replaceChild(frag, nodes[i]);
+  }
+}
+function highlightMatches(kws) {
+  var list = $("msg-list");
+  var marks = list.querySelectorAll("mark.srch"), i;
+  for (i = 0; i < marks.length; i++) {                 // 先清除上一轮高亮
+    var p = marks[i].parentNode;
+    if (p) { p.replaceChild(document.createTextNode(marks[i].textContent), marks[i]); p.normalize(); }
+  }
+  if (!kws.length) return;
+  var items = list.querySelectorAll(".msg");
+  for (i = 0; i < items.length; i++) {
+    if (items[i].style.display === "none") continue;
+    var b = items[i].querySelector(".bubble");
+    if (b) highlightNode(b, kws);
   }
 }
 
@@ -1637,6 +1730,29 @@ function bindRoom() {
   $("btn-onlyq").onclick = function () {
     S.onlyQ = !S.onlyQ;
     this.classList.toggle("on", S.onlyQ);
+    applyOnlyQFilter();
+  };
+
+  /* 搜索发言：工具栏按钮展开/收起搜索条，输入即过滤（applyOnlyQFilter 统一处理） */
+  $("btn-search").onclick = function () {
+    var bar = $("search-bar");
+    bar.classList.toggle("show");
+    if (bar.classList.contains("show")) {
+      $("srch-input").focus();
+    } else {
+      $("srch-input").value = "";
+      S.searchQ = "";
+      applyOnlyQFilter();
+    }
+  };
+  $("srch-input").addEventListener("input", function () {
+    S.searchQ = this.value.trim();
+    applyOnlyQFilter();
+  });
+  $("srch-close").onclick = function () {
+    $("search-bar").classList.remove("show");
+    $("srch-input").value = "";
+    S.searchQ = "";
     applyOnlyQFilter();
   };
 
