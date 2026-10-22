@@ -264,6 +264,14 @@
   .type-btn.mini { color: #9ca3af; border-style: dashed; }
   .char-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
   .input-row { display: flex; gap: 8px; align-items: flex-end; position: relative; }
+  /* 实时预览条：显示含行内着色 / 整条着色的发送效果，与消息气泡同样的富文本渲染 */
+  #input-preview {
+    display: none; padding: 6px 12px; margin-bottom: 8px;
+    background: var(--pink-soft); border: 1px dashed var(--pink-border); border-radius: 10px;
+    font-size: var(--msg-size); line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; max-height: 88px; overflow: auto;
+  }
+  #input-preview.show { display: block; }
   /* 富文本：表情/颜色按钮与浮层 */
   .icon-btn {
     flex: none; width: 38px; height: 46px; border-radius: 12px;
@@ -452,6 +460,7 @@
       <button class="type-btn mini" id="btn-paste" type="button" title="从剪贴板粘贴">粘贴</button>
       <span class="char-count"><span id="char-num">0</span>/300</span>
     </div>
+    <div id="input-preview"></div>
     <div class="input-row">
       <button class="icon-btn" id="btn-emoji" type="button" title="插入表情">😊</button>
       <button class="icon-btn" id="btn-color" type="button" title="消息文字颜色"><span class="dot"></span></button>
@@ -703,6 +712,19 @@ function htmlToMarks(html) {
     return out.replace(/\n{3,}/g, "\n\n");
   } catch (e) { return null; }
 }
+/* 输入框实时预览条：内容含行内标记或设了整条色时，显示发送后的渲染效果 */
+function updatePreview() {
+  var pv = $("input-preview");
+  if (!pv) return;
+  var v = $("msg-input").value;
+  if (!v || (!/\u200bC#[0-9a-fA-F]{6}\u200b/.test(v) && !S.msgColor)) {
+    pv.classList.remove("show");
+    return;
+  }
+  pv.innerHTML = renderRich(v);
+  pv.style.color = S.msgColor || "";
+  pv.classList.add("show");
+}
 function rand16() {
   var s = "abcdefghijklmnopqrstuvwxyz0123456789", r = "";
   for (var i = 0; i < 16; i++) r += s.charAt(Math.floor(Math.random() * s.length));
@@ -841,7 +863,14 @@ function handleServerMsg(m) {
     if (raw.indexOf(MARK_A) === 0) {
       if (!isTeacherName(name)) return;         // 非教师发的公告标记直接丢弃
       var nc = "";
-      var t2 = raw.slice(MARK_A.length).replace(/\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { nc = c; return ""; });
+      var t2 = raw.slice(MARK_A.length);
+      /* 先 stash 包裹标记，防止公告内容里的选区着色被当作整条前缀误剥 */
+      var nstash = [];
+      t2 = t2.replace(/\u200bC#([0-9a-fA-F]{6})\u200b([\s\S]*?)\u200b\/C\u200b/g, function (m0) {
+        nstash.push(m0); return "\u0001" + (nstash.length - 1) + "\u0001";
+      });
+      t2 = t2.replace(/\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { nc = "#" + c; return ""; });
+      if (nstash.length) t2 = t2.replace(/\u0001(\d+)\u0001/g, function (_, i) { return nstash[+i]; });
       var fresh = stripMark(t2);
       var changed = fresh !== S.notice || nc !== (S.noticeColor || "");
       S.notice = fresh;
@@ -850,8 +879,15 @@ function handleServerMsg(m) {
       return;
     }
     /* 普通消息 / 提问 / 回答 / 图片（均可携带颜色前缀） */
+    /* 先 stash 行内包裹标记为占位符：包裹开始符与整条颜色前缀格式相同，
+       不保护会被前缀剥除误吞，导致接收端丢色 + 与本机回显去重失败（双条消息） */
+    var stash = [];
+    var raw0 = raw.replace(/\u200bC#([0-9a-fA-F]{6})\u200b([\s\S]*?)\u200b\/C\u200b/g, function (m0) {
+      stash.push(m0); return "\u0001" + (stash.length - 1) + "\u0001";
+    });
     var color = "";
-    var raw2 = raw.replace(/\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { color = c; return ""; });
+    var raw2 = raw0.replace(/^\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { color = "#" + c; return ""; });
+    if (stash.length) raw2 = raw2.replace(/\u0001(\d+)\u0001/g, function (_, i) { return stash[+i]; });
     if (raw2.indexOf(MARK_IMG) === 0) {
       /* 图片消息：\u200bIMG\u200buid\u200benc文件名\u200b正文 */
       var pp = raw2.split("\u200b");
@@ -1024,6 +1060,7 @@ function renderMsg(msg) {
       setType(msg.type === "question" ? "question" : (msg.type === "answer" ? "answer" : "normal"));
       $("char-num").textContent = input.value.length;
       input.focus();
+      updatePreview();
       toast("已放入编辑框，可修改后发送");
     };
   }
@@ -1248,6 +1285,7 @@ function bindRoom() {
   $("btn-wipe").onclick = function () {
     input.value = "";
     $("char-num").textContent = "0";
+    updatePreview();
     input.focus();
   };
   $("btn-paste").onclick = function () {
@@ -1260,6 +1298,7 @@ function bindRoom() {
       $("char-num").textContent = input.value.length;
       input.focus();
       input.setSelectionRange(st + t.length, st + t.length);
+      updatePreview();
     }).catch(function () { toast("读取剪贴板失败，请用 Ctrl+V"); });
   };
 
@@ -1268,17 +1307,20 @@ function bindRoom() {
     insertAtCursor(input, em);
     $("char-num").textContent = input.value.length;
     input.focus();
+    updatePreview();
   });
   buildSwatches($("swatch-row"), function (c) {
     $("pop-color").classList.remove("show");
     if (c && insertWrap(input, c)) {           // 已选中文字：包裹选区（一段多色）
       $("char-num").textContent = input.value.length;
       input.focus();
+      updatePreview();
       return;
     }
     S.msgColor = c;                            // 未选（或点默认色）：整条消息一色
     setDot($("btn-color"), c);
     input.style.color = c || "";
+    updatePreview();
   });
   var nInput = $("notice-input");
   buildEmojiGrid($("n-emoji-grid"), function (em) { insertAtCursor(nInput, em); nInput.focus(); });
@@ -1312,6 +1354,7 @@ function bindRoom() {
     insertAtCursor(input, conv);
     $("char-num").textContent = input.value.length;
     input.focus();
+    updatePreview();
   });
   /* 复制：把选区剥成纯文本再入剪贴板，避免带出 C#xxxxx / 零宽字符 */
   input.addEventListener("copy", function (e) {
@@ -1331,7 +1374,7 @@ function bindRoom() {
     for (var i = 0; i < ps.length; i++) ps[i].classList.remove("show");
   });
 
-  input.addEventListener("input", function () { $("char-num").textContent = input.value.length; });
+  input.addEventListener("input", function () { $("char-num").textContent = input.value.length; updatePreview(); });
   input.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); sendMsg(); }
   });
@@ -1492,13 +1535,14 @@ function sendMsg() {
   var pre = S.msgColor ? ("\u200bC" + S.msgColor + "\u200b") : "";
   if (!safeSend({ type: "message", data: { message: pre + payload, time: now } })) return;
   S.lastSend = now;
-  /* 本机立即回显（服务器不会把消息发回给发送者本人） */
+  /* 本机立即回显；服务器实际会把消息回传给发送者，pushMsg 按 同名+同毫秒+同内容 去重防双条 */
   pushMsg({
     name: S.name, text: text, time: now, color: S.msgColor,
     type: S.msgType === "question" ? "question" : (S.msgType === "answer" ? "answer" : "normal")
   });
   input.value = "";
   $("char-num").textContent = "0";
+  updatePreview();
   input.focus();
 }
 
