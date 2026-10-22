@@ -53,6 +53,13 @@
     border: 2px solid var(--line); border-radius: 10px; transition: border-color .15s;
   }
   .field input:focus { border-color: var(--pink); }
+  .room-row { display: flex; gap: 8px; }
+  .room-row input { flex: 1; min-width: 0; }
+  .rnd-btn {
+    flex: none; padding: 0 16px; border: 2px solid var(--line); border-radius: 10px;
+    background: #fff; color: var(--muted); font-weight: 600; font-size: 14px;
+  }
+  .rnd-btn:hover { border-color: var(--pink); color: var(--pink-deep); }
   .role-row { display: flex; gap: 10px; }
   .role-btn {
     flex: 1; padding: 11px 0; border-radius: 10px; font-size: 15px;
@@ -152,6 +159,14 @@
     background: var(--warn); color: #fff;
   }
   .ne-btn.gray { background: var(--line); color: var(--muted); }
+  /* 公告实时预览条：显示含行内着色 / 整条着色的公告效果 */
+  #n-preview {
+    flex: none; display: none; padding: 6px 12px;
+    background: #fffbeb; border-bottom: 1px solid #fde68a;
+    font-size: var(--msg-size); line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; max-height: 88px; overflow: auto;
+  }
+  #n-preview.show { display: block; }
 
   /* 消息流 */
   #msg-wrap { flex: 1; position: relative; overflow: hidden; }
@@ -382,7 +397,10 @@
     <p class="sub">教师专用：发公告、上屏学生发言、管理文件</p>
     <div class="field">
       <label>房间号（5 位字母或数字，全班统一）</label>
-      <input id="in-room" maxlength="5" placeholder="例如：a1b2c" autocapitalize="characters" autocomplete="off">
+      <div class="room-row">
+        <input id="in-room" maxlength="5" placeholder="例如：a1b2c" autocapitalize="characters" autocomplete="off">
+        <button class="rnd-btn" id="btn-rand-room" type="button" title="随机生成一个合格房间号">随机</button>
+      </div>
     </div>
     <div class="field">
       <label>你的名字</label>
@@ -442,6 +460,7 @@
       <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
     </div>
   </div>
+  <div id="n-preview"></div>
 
   <!-- 消息流 -->
   <div id="msg-wrap">
@@ -725,6 +744,26 @@ function updatePreview() {
   pv.style.color = S.msgColor || "";
   pv.classList.add("show");
 }
+/* 公告编辑实时预览条：逻辑同 updatePreview，读公告编辑框与公告整条色 */
+function updateNoticePreview() {
+  var pv = $("n-preview");
+  if (!pv) return;
+  var v = $("notice-input").value;
+  if (!v || (!/\u200bC#[0-9a-fA-F]{6}\u200b/.test(v) && !S.noticeColor)) {
+    pv.classList.remove("show");
+    return;
+  }
+  pv.innerHTML = renderRich(v);
+  pv.style.color = S.noticeColor || "";
+  pv.classList.add("show");
+}
+/* 随机生成 5 位合格房间号：避开易混淆字符（0/O、1/I/L），便于课堂口头传达 */
+function randRoom() {
+  var cs = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+  var r = "";
+  for (var i = 0; i < 5; i++) r += cs.charAt(Math.floor(Math.random() * cs.length));
+  return r;
+}
 function rand16() {
   var s = "abcdefghijklmnopqrstuvwxyz0123456789", r = "";
   for (var i = 0; i < 16; i++) r += s.charAt(Math.floor(Math.random() * s.length));
@@ -871,7 +910,8 @@ function handleServerMsg(m) {
       });
       t2 = t2.replace(/\u200bC#([0-9a-fA-F]{6})\u200b/, function (_, c) { nc = "#" + c; return ""; });
       if (nstash.length) t2 = t2.replace(/\u0001(\d+)\u0001/g, function (_, i) { return nstash[+i]; });
-      var fresh = stripMark(t2);
+      var fresh = t2;                           // 公告保留行内包裹标记，渲染时转富文本
+      if (!stripMark(fresh).trim()) fresh = ""; // 实际内容为空视为撤下
       var changed = fresh !== S.notice || nc !== (S.noticeColor || "");
       S.notice = fresh;
       S.noticeColor = nc;
@@ -1161,7 +1201,8 @@ function maybeReplayNotice(name) {
   S.replayedTo[name] = true;
   setTimeout(function () {
     if (S.ws && S.ws.readyState === 1) {
-      safeSend({ type: "message", data: { message: MARK_A + S.notice, time: Date.now() } });
+      var npre = S.noticeColor ? ("\u200bC" + S.noticeColor + "\u200b") : "";
+      safeSend({ type: "message", data: { message: MARK_A + npre + S.notice, time: Date.now() } });
     }
   }, 1000);
 }
@@ -1178,7 +1219,8 @@ function renderNotice(alsoToast) {
   }
   var bar = $("notice-bar");
   if (S.notice) {
-    $("notice-text").textContent = S.notice;
+    $("notice-text").innerHTML = renderRich(S.notice);   // 公告支持行内着色（renderRich 先 esc 防注入）
+    $("notice-text").style.color = S.noticeColor || "";
     bar.classList.add("show");
     bar.classList.remove("folded");
     $("notice-fold").textContent = "收起";
@@ -1221,11 +1263,15 @@ function bindJoin() {
   $("in-key").addEventListener("keydown", function (e) { if (e.key === "Enter") doJoin(); });
   $("in-name").addEventListener("keydown", function (e) { if (e.key === "Enter") doJoin(); });
   $("in-room").addEventListener("keydown", function (e) { if (e.key === "Enter") $("in-name").focus(); });
+  var rb = $("btn-rand-room");
+  if (rb) rb.onclick = function () { $("in-room").value = randRoom(); $("join-err").textContent = ""; };
 
-  /* URL 参数直达：?room=a1b2c&name=张三 */
+  /* URL 参数直达：?room=a1b2c&name=张三；无参数时回填最近一次的房间号/名字 */
   var q = new URLSearchParams(location.search);
   if (q.get("room")) $("in-room").value = q.get("room").replace(/[^a-zA-Z0-9]/g, "").slice(0, 5);
+  else { try { $("in-room").value = localStorage.getItem("cr_room") || ""; } catch (e) {} }
   if (q.get("name")) $("in-name").value = q.get("name").slice(0, 12);
+  else { try { $("in-name").value = localStorage.getItem("cr_name") || ""; } catch (e) {} }
 }
 function doJoin() {
   var room = $("in-room").value.trim().replace(/[^a-zA-Z0-9]/g, "");
@@ -1242,7 +1288,7 @@ function doJoin() {
   S.replayedTo = {};                                     // 公告重发记录（每次进房重置）
   S.fileReplayedTo = {};                                 // 文件重发记录
   S.fileCache = {};                                      // 文件缓存（进房后由 fileList 对账重建）
-  try { localStorage.setItem("cr_name", name); } catch (e) {}
+  try { localStorage.setItem("cr_name", name); localStorage.setItem("cr_room", room); } catch (e) {}
 
   $("view-join").style.display = "none";
   $("view-room").style.display = "flex";
@@ -1323,12 +1369,22 @@ function bindRoom() {
     updatePreview();
   });
   var nInput = $("notice-input");
-  buildEmojiGrid($("n-emoji-grid"), function (em) { insertAtCursor(nInput, em); nInput.focus(); });
+  nInput.addEventListener("input", updateNoticePreview);
+  buildEmojiGrid($("n-emoji-grid"), function (em) {
+    insertAtCursor(nInput, em);
+    nInput.focus();
+    updateNoticePreview();
+  });
   buildSwatches($("n-swatch-row"), function (c) {
-    S.noticeColor = c;
+    $("n-pop-color").classList.remove("show");
+    if (c && insertWrap(nInput, c)) {          // 已选中文字：包裹选区（公告也支持一段多色）
+      updateNoticePreview();
+      return;
+    }
+    S.noticeColor = c;                         // 未选（或点默认色）：整条公告一色
     setDot($("btn-notice-color"), c);
     nInput.style.color = c || "";
-    $("n-pop-color").classList.remove("show");
+    updateNoticePreview();
   });
   function togglePop(btn, popId) {
     btn.onclick = function (e) {
@@ -1430,6 +1486,7 @@ function bindRoom() {
       $("notice-input").style.color = "";
       setDot($("btn-notice-color"), "");
       renderNotice(false);
+      updateNoticePreview();
       toast("公告已撤下");
     }
   };
