@@ -1866,6 +1866,8 @@ function bindRoom() {
   $("msg-list").addEventListener("scroll", function () {
     if (this.scrollHeight - this.scrollTop - this.clientHeight < 120) {
       $("btn-bottom").classList.remove("show");
+    } else {                                            // 手动滚离底部 → 显示回底按钮
+      $("btn-bottom").classList.add("show");
     }
     if (this.scrollTop > this.clientHeight) {           // 距顶部超过一屏 → 显示回顶按钮
       $("btn-top").classList.add("show");
