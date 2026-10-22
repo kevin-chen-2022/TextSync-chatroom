@@ -319,6 +319,33 @@
   .msg.mine .img-bubble { background: var(--pink-soft); border-color: var(--pink-border); border-radius: 14px 4px 14px 14px; }
   .msg.is-t .img-bubble { background: #fdf2f8; border-color: var(--pink-border); }
   .img-bubble img { display: block; max-width: 100%; max-height: 260px; border-radius: 10px; cursor: zoom-in; }
+  /* 图片全屏预览（Lightbox）：遮罩 + 居中大图，滚轮/捏合缩放，拖动平移 */
+  #lightbox {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(15, 23, 42, .9);
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none;
+  }
+  #lightbox[hidden] { display: none; }
+  #lb-img {
+    max-width: 92vw; max-height: 88vh;
+    transform-origin: center center;
+    user-select: none; -webkit-user-drag: none;
+    border-radius: 6px; box-shadow: 0 8px 40px rgba(0, 0, 0, .5);
+  }
+  .lb-bar {
+    position: absolute; top: 10px; right: 12px;
+    display: flex; gap: 4px; align-items: center;
+    background: rgba(255, 255, 255, .94); border-radius: 10px; padding: 5px 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .3);
+  }
+  .lb-pct { font-size: 12px; color: #64748b; min-width: 40px; text-align: center; font-weight: 600; }
+  .lb-btn {
+    width: 30px; height: 30px; border: none; border-radius: 8px; background: transparent;
+    color: #334155; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    text-decoration: none; font-size: 12px; font-weight: 700;
+  }
+  .lb-btn:hover { background: var(--pink-soft); color: var(--pink-deep); }
   .img-cap { font-size: var(--msg-size); line-height: 1.5; padding: 6px 4px 2px; white-space: pre-wrap; word-break: break-word; }
   .img-up { font-size: 14px; padding: 4px 2px; }
   #msg-input {
@@ -525,6 +552,26 @@
 </div>
 
 <div id="toast"></div>
+
+<div id="lightbox" hidden>
+  <div class="lb-bar">
+    <span class="lb-pct" id="lb-pct">100%</span>
+    <button class="lb-btn" id="lb-zin" type="button" title="放大">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>
+    </button>
+    <button class="lb-btn" id="lb-zout" type="button" title="缩小">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>
+    </button>
+    <button class="lb-btn lb-txt" id="lb-reset" type="button" title="复位（也可双击图片）">1:1</button>
+    <a class="lb-btn" id="lb-dl" download title="下载">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    </a>
+    <button class="lb-btn" id="lb-close" type="button" title="关闭 (Esc)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <img id="lb-img" alt="图片预览">
+</div>
 
 <script>
 "use strict";
@@ -943,7 +990,7 @@ function handleServerMsg(m) {
       var icap = stripMark(pp.slice(4).join("\u200b"));
       pushMsg({
         name: name, text: icap, time: time, type: "image", color: color,
-        file: { id: "i" + time, name: decodeURIComponent(pp[3] || "图片.jpg"), size: 0, uid: iuid }
+        file: { id: iuid, name: decodeURIComponent(pp[3] || "图片.jpg"), size: 0, uid: iuid } // id=uid 与发送端占位一致，去重防双图
       });
       return;
     }
@@ -1032,12 +1079,13 @@ function removeFileCard(id) {
 
 /* ---------- 消息渲染 ---------- */
 function pushMsg(msg, skipSave) {
-  /* 去重：文件按 id 全量查（fileList 全量广播会反复携带旧文件）；
+  /* 去重：文件/图片按 file.id 全量查（fileList 全量广播会反复携带旧文件；
+     图片的发送端占位与服务器 echo 用同一 uid 对齐，防发送端双图）；
      文本按 同名 + 同毫秒 + 同内容，查最近 8 条 */
   var i, o;
-  if (msg.type === "file") {
+  if ((msg.type === "file" || msg.type === "image") && msg.file) {
     for (i = 0; i < S.msgs.length; i++) {
-      if (S.msgs[i].type === "file" && S.msgs[i].file.id === msg.file.id) return;
+      if ((S.msgs[i].type === "file" || S.msgs[i].type === "image") && S.msgs[i].file && S.msgs[i].file.id === msg.file.id) return;
     }
   } else {
     var key = msg.name + "|" + msg.time + "|" + msg.text;
@@ -1160,12 +1208,107 @@ function imageBubbleHtml(msg) {
   var url = FILE_DL + msg.file.uid + "/" + encodeURIComponent(msg.file.name);
   return (
     '<div class="img-bubble">' +
-      '<a href="' + url + '" target="_blank" rel="noopener">' +
+      '<a href="' + url + '" class="lb-link">' +
         '<img src="' + url + '" alt="' + esc(msg.file.name) + '" loading="lazy">' +
       "</a>" +
       (msg.text ? '<div class="img-cap">' + esc(msg.text) + "</div>" : "") +
     "</div>"
   );
+}
+/* ---------- 图片全屏预览（Lightbox）：滚轮/捏合缩放、拖动平移、双击复位 ---------- */
+var LB = { s: 1, x: 0, y: 0, drag: null, ptrs: {}, pinch: 0, pinchS: 1, mask: null };
+function lbApply() {
+  LB.s = Math.min(8, Math.max(0.2, LB.s));
+  $("lb-img").style.transform = "translate(" + LB.x + "px," + LB.y + "px) scale(" + LB.s + ")";
+  $("lb-pct").textContent = Math.round(LB.s * 100) + "%";
+}
+/* 以 (cx,cy) 为锚点缩放：保持锚点下的图像内容不动 */
+function lbZoomAt(f, cx, cy) {
+  var r = $("lightbox").getBoundingClientRect();
+  var k = Math.min(8, Math.max(0.2, LB.s * f)) / LB.s;
+  LB.x = (cx - r.width / 2) * (1 - k) + LB.x * k;
+  LB.y = (cy - r.height / 2) * (1 - k) + LB.y * k;
+  LB.s *= k;
+  lbApply();
+}
+function lbOpen(src, dl) {
+  $("lb-img").src = src;
+  var a = $("lb-dl");
+  a.href = dl || src;
+  a.setAttribute("download", "");
+  LB.s = 1; LB.x = 0; LB.y = 0;
+  $("lightbox").hidden = false;
+  lbApply();
+}
+function lbClose() {
+  $("lightbox").hidden = true;
+  $("lb-img").src = "";
+  LB.drag = null; LB.ptrs = {}; LB.mask = null;
+}
+function initLightbox() {
+  var box = $("lightbox"), img = $("lb-img");
+  if (!box) return;
+  /* 点击对话中的图片打开预览（事件委托，历史消息同样生效） */
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a.lb-link") : null;
+    if (!a) return;
+    e.preventDefault();
+    lbOpen(a.href, a.href);
+  });
+  $("lb-zin").onclick = function () { lbZoomAt(1.25, innerWidth / 2, innerHeight / 2); };
+  $("lb-zout").onclick = function () { lbZoomAt(0.8, innerWidth / 2, innerHeight / 2); };
+  $("lb-reset").onclick = function () { LB.s = 1; LB.x = 0; LB.y = 0; lbApply(); };
+  $("lb-close").onclick = lbClose;
+  box.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    lbZoomAt(e.deltaY < 0 ? 1.15 : 0.87, e.clientX, e.clientY);
+  }, { passive: false });
+  box.addEventListener("pointerdown", function (e) {
+    LB.mask = (e.target === box) ? { x: e.clientX, y: e.clientY } : null;  // 按在遮罩上且几乎没移动 → 关闭
+    LB.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var n = Object.keys(LB.ptrs).length;
+    if (n === 1) {
+      LB.drag = { sx: e.clientX - LB.x, sy: e.clientY - LB.y };
+    } else if (n === 2) {
+      LB.drag = null;
+      var p = [];
+      for (var k in LB.ptrs) p.push(LB.ptrs[k]);
+      LB.pinch = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      LB.pinchS = LB.s;
+    }
+    if (box.setPointerCapture) try { box.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  box.addEventListener("pointermove", function (e) {
+    if (!LB.ptrs[e.pointerId]) return;
+    LB.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var n = Object.keys(LB.ptrs).length;
+    if (n === 2) {                                   // 双指捏合缩放（以视口中心为锚）
+      var p = [];
+      for (var k in LB.ptrs) p.push(LB.ptrs[k]);
+      var d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      if (LB.pinch > 0) { LB.s = LB.pinchS * d / LB.pinch; lbApply(); }
+    } else if (n === 1 && LB.drag) {                 // 单指 / 鼠标拖动平移
+      LB.x = e.clientX - LB.drag.sx;
+      LB.y = e.clientY - LB.drag.sy;
+      lbApply();
+    }
+  });
+  function endPtr(e) {
+    if (LB.mask && Math.hypot(e.clientX - LB.mask.x, e.clientY - LB.mask.y) < 6) { lbClose(); return; }
+    delete LB.ptrs[e.pointerId];
+    if (Object.keys(LB.ptrs).length === 0) LB.drag = null;
+    if (Object.keys(LB.ptrs).length === 1) {         // 捏合抬一指：回到拖动态
+      var p = [];
+      for (var k in LB.ptrs) p.push(LB.ptrs[k]);
+      LB.drag = { sx: p[0].x - LB.x, sy: p[0].y - LB.y };
+    }
+  }
+  box.addEventListener("pointerup", endPtr);
+  box.addEventListener("pointercancel", endPtr);
+  img.addEventListener("dblclick", function () { LB.s = 1; LB.x = 0; LB.y = 0; lbApply(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("lightbox").hidden) lbClose();
+  });
 }
 function addSysMsg(text) {
   var list = $("msg-list");
@@ -1424,11 +1567,11 @@ function bindRoom() {
       for (var pi = 0; pi < items.length; pi++) {
         if (items[pi].type && items[pi].type.indexOf("image/") === 0) {
           var pf = items[pi].getAsFile();
-          if (pf && confirm("检测到剪贴板中的图片，发送到讨论室？")) {
+          if (pf) {                                // 无感上传：粘贴即发送（复用压缩/上限链路）
             e.preventDefault();
             sendImage(pf);
           }
-          break;                                   // 只处理首个图片项；取消则继续走下方文本粘贴
+          break;                                   // 只处理首个图片项；无文件时继续走下方文本粘贴
         }
       }
     }
@@ -1689,7 +1832,7 @@ function sendImage(file) {
     go(file, file.name);
   }
   function go(blob, fname) {
-    var uid = rand16(), id = rand16();
+    var uid = rand16(), id = uid;   // id=uid：与服务器 echo 的 file.id 对齐，配合 pushMsg 去重防发送端双图
     var msg = {
       type: "image", uploading: true, time: Date.now(), name: S.name, color: S.msgColor,
       text: "", file: { id: id, name: fname, size: blob.size, uid: uid }
@@ -1757,6 +1900,7 @@ function compressImage(file, maxSide, q, done) {
 loadLS();
 document.documentElement.style.setProperty("--msg-size", S.fontSize + "px");
 bindJoin();
+initLightbox();
 bindRoom();
 /* 恢复上次昵称 */
 try {
