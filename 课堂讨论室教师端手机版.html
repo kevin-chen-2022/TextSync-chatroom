@@ -2080,8 +2080,28 @@ function bindRoom() {
       var p = $(popId);
       var open = p.classList.contains("show");
       var all = document.querySelectorAll(".composer-pop.show");
-      for (var i = 0; i < all.length; i++) all[i].classList.remove("show");
-      if (!open) p.classList.add("show");
+      for (var i = 0; i < all.length; i++) {
+        all[i].classList.remove("show");
+        all[i].style.position = "";
+        all[i].style.left = "";
+        all[i].style.top = "";
+      }
+      if (!open) {
+        p.classList.add("show");
+        // 手机端 .tool-row 带横向滚动，会裁剪 absolute 浮层；改用 fixed 定位避免被截断
+        if (btn.closest && btn.closest(".tool-row")) {
+          var rect = btn.getBoundingClientRect();
+          var h = p.offsetHeight || (popId.indexOf("emoji") !== -1 ? 130 : 80);
+          var w = p.offsetWidth || (popId.indexOf("emoji") !== -1 ? 270 : 260);
+          var top = rect.top - h - 8;
+          var left = rect.left;
+          if (left + w > innerWidth - 10) left = innerWidth - w - 10;
+          if (left < 10) left = 10;
+          p.style.position = "fixed";
+          p.style.left = left + "px";
+          p.style.top = top + "px";
+        }
+      }
     };
   }
   togglePop($("btn-emoji"), "pop-emoji");
@@ -2128,7 +2148,12 @@ function bindRoom() {
   document.addEventListener("click", function (e) {
     if (e.target.closest && (e.target.closest(".composer-pop") || e.target.closest(".icon-btn"))) return;
     var ps = document.querySelectorAll(".composer-pop.show");
-    for (var i = 0; i < ps.length; i++) ps[i].classList.remove("show");
+    for (var i = 0; i < ps.length; i++) {
+      ps[i].classList.remove("show");
+      ps[i].style.position = "";
+      ps[i].style.left = "";
+      ps[i].style.top = "";
+    }
   });
 
   input.addEventListener("input", function () { $("char-num").textContent = input.value.length; updatePreview(); });
