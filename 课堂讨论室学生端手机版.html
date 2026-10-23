@@ -376,6 +376,7 @@
     flex: none; width: 38px; height: 46px; border-radius: 12px;
     background: var(--bg); font-size: 19px; line-height: 1;
     display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; cursor: pointer;
   }
   .icon-btn:active { background: var(--pink-soft); }
   .icon-btn .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); background: #fff; }
@@ -2021,8 +2022,9 @@ function bindRoom() {
     updateNoticePreview();
   });
   function togglePop(btn, popId) {
-    btn.onclick = function (e) {
-      e.stopPropagation();
+    var lastTouch = 0;
+    function doToggle(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
       var p = $(popId);
       var open = p.classList.contains("show");
       var all = document.querySelectorAll(".composer-pop.show");
@@ -2048,7 +2050,16 @@ function bindRoom() {
           p.style.top = top + "px";
         }
       }
+    }
+    btn.onclick = function (e) {
+      if (Date.now() - lastTouch < 500) return;
+      doToggle(e);
     };
+    btn.addEventListener("touchend", function (e) {
+      e.preventDefault();
+      lastTouch = Date.now();
+      doToggle(e);
+    }, { passive: false });
   }
   togglePop($("btn-emoji"), "pop-emoji");
   togglePop($("btn-color"), "pop-color");
