@@ -306,8 +306,59 @@
   .type-btn.on-q { border-color: #f97316; color: #c2410c; background: #fff7ed; }
   .type-btn.on-a { border-color: #10b981; color: #15803d; background: #f0fdf4; }
   .type-btn.mini { color: #9ca3af; border-style: dashed; }
-  .char-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
-  .input-row { display: flex; gap: 8px; align-items: flex-end; position: relative; }
+  /* 工具按钮的包裹层，负责给 composer-pop 提供定位基准 */
+  .tool-wrap { position: relative; flex: none; }
+  .char-count { font-size: 12px; color: #9ca3af; white-space: nowrap; }
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  /* 输入框下方辅助行：展开按钮 + 字数 + 清空 */
+  .sub-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .sub-row .spacer { flex: 1; }
+  .expand-btn {
+    flex: none; width: 38px; height: 30px; border-radius: 8px;
+    background: var(--bg); color: var(--muted); font-size: 16px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    border: 1.5px dashed var(--line); padding: 0; cursor: pointer;
+  }
+  .expand-btn:active { background: var(--pink-soft); color: var(--pink-deep); border-color: var(--pink); }
+  /* 半屏展开编辑弹层 */
+  #expand-mask {
+    position: fixed; inset: 0; z-index: 90;
+    background: rgba(15, 23, 42, .45);
+    display: none;
+  }
+  #expand-mask.show { display: block; }
+  #expand-editor {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: #fff; border-radius: 18px 18px 0 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column;
+    max-height: 72dvh;
+  }
+  .expand-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .expand-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .expand-head .spacer { flex: 1; }
+  .expand-close {
+    flex: none; height: 30px; padding: 0 14px; border-radius: 15px;
+    background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 700;
+    border: 1.5px solid var(--line);
+  }
+  .expand-close:active { background: var(--pink-soft); color: var(--pink-deep); border-color: var(--pink); }
+  #expand-textarea {
+    flex: 1; resize: none; border: 2px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; font-size: 16px; line-height: 1.55;
+    background: var(--bg); min-height: 160px;
+    transition: border-color .15s;
+  }
+  #expand-textarea:focus { border-color: var(--pink); background: #fff; }
+  .expand-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .expand-foot .char-count { margin-left: auto; }
+  #expand-send {
+    flex: none; padding: 12px 24px; border-radius: 12px; border: none;
+    background: linear-gradient(90deg, var(--pink), var(--pink-deep));
+    color: #fff; font-size: 16px; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(236,72,153,.35);
+  }
+  #expand-send:disabled { opacity: .5; box-shadow: none; }
   /* 实时预览条：显示含行内着色 / 整条着色的发送效果，与消息气泡同样的富文本渲染 */
   #input-preview {
     display: none; padding: 6px 12px; margin-bottom: 8px;
@@ -519,16 +570,22 @@
   .type-row::-webkit-scrollbar { display: none; }
   .type-btn { flex: none; padding: 8px 12px; font-size: 14px; min-height: 38px; }
   .type-btn.mini { padding: 8px 8px; font-size: 12px; }
-  .char-count { flex: none; font-size: 11px; }
+  .char-count { font-size: 11px; }
   #input-preview { font-size: 14px; max-height: 72px; margin-bottom: 7px; padding: 6px 10px; }
   .input-row { gap: 6px; align-items: flex-end; }
+  .sub-row { gap: 6px; margin-top: 5px; }
+  .tool-wrap { flex: none; }
   .icon-btn { width: 36px; height: 42px; border-radius: 10px; font-size: 18px; }
   #btn-file { width: 36px; height: 42px; border-radius: 10px; }
   #msg-input {
-    min-width: 0; min-height: 44px; max-height: 110px;
+    min-width: 0; min-height: 44px; max-height: 130px;
     padding: 9px 10px; font-size: 16px; border-radius: 10px;
   }
   #btn-send { flex: none; padding: 12px 14px; font-size: 15px; border-radius: 10px; }
+  .expand-btn { width: 34px; height: 32px; border-radius: 10px; font-size: 15px; }
+  #expand-editor { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; max-height: 75dvh; }
+  #expand-textarea { min-height: 180px; padding: 10px 12px; font-size: 16px; border-radius: 10px; }
+  #expand-send { padding: 12px 18px; font-size: 15px; border-radius: 10px; }
   .composer-pop { max-width: calc(100vw - 20px); }
   .emoji-grid { grid-template-columns: repeat(8, 30px); gap: 3px; }
   .emoji-item { width: 30px; height: 30px; font-size: 18px; }
@@ -663,20 +720,44 @@
       <button class="type-btn" id="type-question" type="button">提问</button>
       <button class="type-btn" id="type-answer" type="button">回答</button>
       <span class="tb-spacer"></span>
-      <button class="type-btn mini" id="btn-wipe" type="button" title="清空输入框">清空</button>
       <button class="type-btn mini" id="btn-paste" type="button" title="从剪贴板粘贴">粘贴</button>
-      <span class="char-count"><span id="char-num">0</span>/300</span>
     </div>
     <div id="input-preview"></div>
     <div class="input-row">
-      <button class="icon-btn" id="btn-emoji" type="button" title="插入表情">😊</button>
-      <button class="icon-btn" id="btn-color" type="button" title="消息文字颜色"><span class="dot"></span></button>
-      <button id="btn-file" type="button" title="发送文件 / 图片（图片限 10MB，大图自动压缩）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
       <textarea id="msg-input" maxlength="300" placeholder="输入内容，点击发送"></textarea>
       <button id="btn-send" type="button">发送</button>
+      <button id="btn-file" type="button" title="发送文件 / 图片（图片限 10MB，大图自动压缩）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+      <div class="tool-wrap">
+        <button class="icon-btn" id="btn-color" type="button" title="消息文字颜色"><span class="dot"></span></button>
+        <div class="composer-pop" id="pop-color"><div class="pop-hint">整条消息的文字颜色</div><div class="sw-row" id="swatch-row"></div></div>
+      </div>
+      <div class="tool-wrap">
+        <button class="icon-btn" id="btn-emoji" type="button" title="插入表情">😊</button>
+        <div class="composer-pop" id="pop-emoji"><div class="emoji-grid" id="emoji-grid"></div></div>
+      </div>
       <input type="file" id="file-in" hidden>
-      <div class="composer-pop" id="pop-emoji"><div class="emoji-grid" id="emoji-grid"></div></div>
-      <div class="composer-pop" id="pop-color"><div class="pop-hint">整条消息的文字颜色</div><div class="sw-row" id="swatch-row"></div></div>
+    </div>
+    <div class="sub-row">
+      <button class="expand-btn" id="btn-expand" type="button" title="展开大输入框">⤢</button>
+      <span class="spacer"></span>
+      <span class="char-count"><span id="char-num">0</span>/300</span>
+      <button class="type-btn mini" id="btn-wipe" type="button" title="清空输入框">清空</button>
+    </div>
+  </div>
+
+  <!-- 半屏展开编辑弹层 -->
+  <div id="expand-mask">
+    <div id="expand-editor">
+      <div class="expand-head">
+        <span class="expand-title">展开编辑（最多 300 字）</span>
+        <span class="spacer"></span>
+        <button class="expand-close" id="expand-close" type="button">收起</button>
+      </div>
+      <textarea id="expand-textarea" maxlength="300" placeholder="在这里输入较长内容，更方便编辑"></textarea>
+      <div class="expand-foot">
+        <span class="char-count"><span id="expand-char-num">0</span>/300</span>
+        <button id="expand-send" type="button">发送</button>
+      </div>
     </div>
   </div>
 
@@ -1875,6 +1956,34 @@ function bindRoom() {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); sendMsg(); }
   });
   $("btn-send").onclick = sendMsg;
+
+  /* 半屏展开编辑弹层 */
+  var $expandMask = $("expand-mask"),
+      $expandText = $("expand-textarea"),
+      $expandChar = $("expand-char-num");
+  $("btn-expand").onclick = function () {
+    $expandText.value = input.value;
+    $expandChar.textContent = $expandText.value.length;
+    $expandMask.classList.add("show");
+    setTimeout(function () { $expandText.focus(); }, 60);
+  };
+  $("expand-close").onclick = function () {
+    input.value = $expandText.value;
+    $("char-num").textContent = input.value.length;
+    $expandMask.classList.remove("show");
+    updatePreview();
+  };
+  $expandText.addEventListener("input", function () {
+    $expandChar.textContent = $expandText.value.length;
+  });
+  $expandMask.addEventListener("click", function (e) {
+    if (e.target === $expandMask) $("expand-close").click();
+  });
+  $("expand-send").onclick = function () {
+    input.value = $expandText.value;
+    $expandMask.classList.remove("show");
+    sendMsg();
+  };
 
   /* 文件发送 */
   $("btn-file").onclick = function () { $("file-in").click(); };
