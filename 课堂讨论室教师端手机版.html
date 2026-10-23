@@ -102,6 +102,20 @@
     padding: 4px 8px; border-radius: 8px;
   }
   .tb-members:hover { background: var(--bg); }
+  /* 更多菜单 */
+  #more-pop {
+    display: none; position: fixed; right: 12px; top: 56px;
+    min-width: 132px; background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 6px; z-index: 75;
+  }
+  #more-pop.show { display: block; }
+  .more-item {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    background: none; border: none; font-size: 14px; color: var(--ink); text-align: left;
+  }
+  .more-item:active { background: var(--pink-soft); }
+  .more-item.danger { color: #ef4444; }
   .tb-spacer { flex: 1; }
   .tb-btn {
     flex: none; padding: 6px 10px; font-size: 13px; border-radius: 8px;
@@ -672,6 +686,9 @@
 [data-theme="dark"] .icon-btn:active { background: #27272a; }
 [data-theme="dark"] .tb-btn.on { color: #f472b6; }
 [data-theme="dark"] .tb-members:hover { background: #27272a; }
+[data-theme="dark"] #more-pop { background: #18181b; border-color: #374151; }
+[data-theme="dark"] .more-item { color: #f3f4f6; }
+[data-theme="dark"] .more-item:active { background: #27272a; }
 [data-theme="dark"] #member-pop { background: #18181b; border-color: #374151; }
 [data-theme="dark"] #member-pop h4,
 [data-theme="dark"] #member-pop .mrow { color: #9ca3af; }
@@ -821,10 +838,9 @@
     <div class="tb-line">
       <div class="tb-room"><small>房间号</small><span id="tb-room-id">-----</span></div>
       <span class="dot" id="conn-dot"></span>
-      <span class="tb-members" id="tb-members">成员 1</span>
       <span class="tb-spacer"></span>
       <button class="tb-btn" id="btn-theme" type="button" title="切换明暗主题">🌙</button>
-      <button class="tb-btn" id="btn-settings" type="button">设置</button>
+      <button class="tb-btn" id="btn-more" type="button" title="更多">⋮</button>
     </div>
     <div class="tb-line tb-tools" title="调整消息字号，方便后排观看">
       <button class="fs-btn" id="fs-minus" type="button">A-</button>
@@ -835,6 +851,13 @@
       <button class="tb-btn" id="btn-export" type="button">导出</button>
       <button class="tb-btn" id="btn-clear" type="button">清屏</button>
     </div>
+  </div>
+
+  <!-- 更多菜单（成员 / 设置 / 退出） -->
+  <div id="more-pop">
+    <button class="more-item" id="more-members" type="button">成员 <span id="more-members-count">1</span></button>
+    <button class="more-item" id="more-settings" type="button">设置</button>
+    <button class="more-item danger" id="more-leave" type="button">退出房间</button>
   </div>
 
   <!-- 教师公告（置顶显示，不随消息滚动） -->
@@ -1903,7 +1926,8 @@ function pinToScreen(name, text) {
 /* ---------- 成员 ---------- */
 function renderMembers() {
   var names = Object.keys(S.members);
-  $("tb-members").textContent = "成员 " + names.length;
+  var count = names.length;
+  $("more-members-count").textContent = count;
   var box = $("member-list");
   box.innerHTML = "";
   names.sort(function (a, b) {
@@ -2378,8 +2402,26 @@ function bindRoom() {
     addSysMsg("屏幕已清空");
   };
 
+  /* 更多菜单 */
+  function toggleMore(show) {
+    $("more-pop").classList.toggle("show", show);
+  }
+  $("btn-more").onclick = function (e) {
+    e.stopPropagation();
+    var pop = $("more-pop");
+    var open = pop.classList.contains("show");
+    toggleMore(!open);
+  };
+  document.addEventListener("click", function (e) {
+    var pop = $("more-pop");
+    if (pop.classList.contains("show") && !pop.contains(e.target) && e.target.id !== "btn-more") {
+      pop.classList.remove("show");
+    }
+  });
+
   /* 成员浮层 */
-  $("tb-members").onclick = function (e) {
+  $("more-members").onclick = function (e) {
+    $("more-pop").classList.remove("show");
     var pop = $("member-pop");
     var open = pop.style.display === "block";
     pop.style.display = open ? "none" : "block";
@@ -2387,7 +2429,7 @@ function bindRoom() {
   };
   document.addEventListener("click", function (e) {
     var pop = $("member-pop");
-    if (pop.style.display === "block" && !pop.contains(e.target) && e.target.id !== "tb-members") {
+    if (pop.style.display === "block" && !pop.contains(e.target) && e.target.id !== "more-members" && !e.target.closest("#more-pop")) {
       pop.style.display = "none";
     }
   });
@@ -2446,7 +2488,8 @@ function bindRoom() {
   if (joinThemeBtn) joinThemeBtn.onclick = toggleTheme;
   initTheme();
   updateThemeIcon();
-  $("btn-settings").onclick = function () {
+  $("more-settings").onclick = function () {
+    $("more-pop").classList.remove("show");
     $("st-words").value = S.words;
     $("st-filter-on").checked = S.filterOn;
     $("settings-mask").classList.add("show");
@@ -2462,6 +2505,24 @@ function bindRoom() {
   $("settings-mask").addEventListener("click", function (e) {
     if (e.target === this) this.classList.remove("show");
   });
+
+  /* 退出房间 */
+  $("more-leave").onclick = function () {
+    $("more-pop").classList.remove("show");
+    S.closedByUser = true;
+    if (S.retryTimer) { clearTimeout(S.retryTimer); S.retryTimer = null; }
+    if (S.ws) { S.ws.close(); S.ws = null; }
+    S.wsOk = false;
+    $("view-room").style.display = "none";
+    $("view-join").style.display = "flex";
+    S.members = {}; S.msgs = []; S.notice = "";
+    $("msg-list").innerHTML = "";
+    $("member-list").innerHTML = "";
+    $("notice-text").innerHTML = "";
+    $("notice-edit").classList.remove("show");
+    document.body.classList.remove("is-teacher");
+    updateDot();
+  };
 }
 function setFont(px) {
   S.fontSize = Math.max(14, Math.min(30, px));
