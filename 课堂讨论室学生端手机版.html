@@ -334,6 +334,14 @@
   }
   .expand-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: nowrap; }
   .expand-head .char-count { flex: none; margin-left: 6px; }
+  .expand-tool { display: flex; gap: 4px; flex: none; align-items: center; }
+  .expand-preview {
+    display: none; padding: 6px 12px; margin-bottom: 10px;
+    background: var(--pink-soft); border: 1px dashed var(--pink-border); border-radius: 10px;
+    font-size: var(--msg-size); line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; max-height: 90px; overflow: auto;
+  }
+  .expand-preview.show { display: block; }
   .expand-close, #expand-send {
     flex: none; height: 38px; padding: 0 16px; border-radius: 19px;
     font-size: 14px; font-weight: 700; border: 1.5px solid var(--line);
@@ -713,10 +721,21 @@
   <div id="expand-mask">
     <div id="expand-editor">
       <div class="expand-head">
+        <div class="expand-tool">
+          <div class="tool-wrap">
+            <button class="icon-btn" id="expand-emoji" type="button" title="插入表情">😊</button>
+            <div class="composer-pop" id="expand-pop-emoji"><div class="emoji-grid" id="expand-emoji-grid"></div></div>
+          </div>
+          <div class="tool-wrap">
+            <button class="icon-btn" id="expand-color" type="button" title="消息文字颜色"><span class="dot"></span></button>
+            <div class="composer-pop" id="expand-pop-color"><div class="pop-hint">整条消息的文字颜色</div><div class="sw-row" id="expand-swatch-row"></div></div>
+          </div>
+        </div>
         <button class="expand-close" id="expand-close" type="button">收起</button>
         <span class="char-count"><span id="expand-char-num">0</span>/300</span>
         <button id="expand-send" type="button">发送</button>
       </div>
+      <div class="expand-preview" id="expand-preview"></div>
       <textarea id="expand-textarea" maxlength="300" placeholder="在这里输入较长内容，更方便编辑"></textarea>
     </div>
   </div>
@@ -1901,12 +1920,15 @@ function bindRoom() {
   /* 半屏展开编辑弹层 */
   var $expandMask = $("expand-mask"),
       $expandText = $("expand-textarea"),
-      $expandChar = $("expand-char-num");
+      $expandChar = $("expand-char-num"),
+      $expandPreview = $("expand-preview"),
+      $expandColorBtn = $("expand-color");
   $("btn-expand").onclick = function () {
     $expandText.value = input.value;
     $expandChar.textContent = $expandText.value.length;
     $expandMask.classList.add("show");
-    // 等遮层登场再 focus，避开键盘首次弹起延迟
+    setDot($expandColorBtn, S.msgColor);
+    syncExpandPreview();
     setTimeout(function () { $expandText.focus(); }, 60);
   };
   $("expand-close").onclick = function () {
@@ -1915,8 +1937,24 @@ function bindRoom() {
     $expandMask.classList.remove("show");
     updatePreview();
   };
+  function syncExpandPreview() {
+    var v = $expandText.value;
+    if (!v || (!/\u200bC#[0-9a-fA-F]{6}\u200b/.test(v) && !S.msgColor)) {
+      $expandPreview.classList.remove("show"); return;
+    }
+    $expandPreview.innerHTML = renderRich(v);
+    $expandPreview.style.color = S.msgColor || "";
+    $expandPreview.classList.add("show");
+  }
+  function syncDualPreview() {
+    updatePreview();
+    syncExpandPreview();
+  }
   $expandText.addEventListener("input", function () {
+    input.value = $expandText.value;
+    $("char-num").textContent = input.value.length;
     $expandChar.textContent = $expandText.value.length;
+    syncDualPreview();
   });
   $expandMask.addEventListener("click", function (e) {
     if (e.target === $expandMask) $("expand-close").click();
@@ -1926,6 +1964,38 @@ function bindRoom() {
     $expandMask.classList.remove("show");
     sendMsg();
   };
+  /* 弹层专属：表情 / 颜色（操作 expand-textarea，共享全局 msgColor） */
+  function bindExpandComposer() {
+    togglePop($("expand-emoji"), "expand-pop-emoji");
+    togglePop($("expand-color"), "expand-pop-color");
+    buildEmojiGrid($("expand-emoji-grid"), function (em) {
+      $("expand-pop-emoji").classList.remove("show");
+      insertAtCursor($expandText, em);
+      $expandText.focus();
+      input.value = $expandText.value;
+      $("char-num").textContent = input.value.length;
+      $expandChar.textContent = $expandText.value.length;
+      syncDualPreview();
+    });
+    buildSwatches($("expand-swatch-row"), function (c) {
+      $("expand-pop-color").classList.remove("show");
+      if (c && insertWrap($expandText, c)) {
+        input.value = $expandText.value;
+        $("char-num").textContent = input.value.length;
+        $expandChar.textContent = $expandText.value.length;
+        $expandText.focus();
+        syncDualPreview();
+        return;
+      }
+      S.msgColor = c;
+      setDot($expandColorBtn, c);
+      setDot($("btn-color"), c);
+      $expandText.style.color = c || "";
+      $expandText.focus();
+      syncDualPreview();
+    });
+  }
+  bindExpandComposer();
 
   /* 文件发送 */
   $("btn-file").onclick = function () { $("file-in").click(); };
