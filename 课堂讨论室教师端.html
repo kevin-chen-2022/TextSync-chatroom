@@ -450,6 +450,16 @@
     .tb-room { font-size: 16px; }
     .tool-row { flex-wrap: wrap; }
   }
+  /* 进房页右上角明暗切换（房间内顶栏另有按钮） */
+  #btn-theme-join {
+    position: fixed; top: 16px; right: 16px; width: 42px; height: 42px;
+    border-radius: 50%; background: rgba(255,255,255,.94); color: #374151;
+    font-size: 18px; line-height: 1; display: flex; align-items: center;
+    justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+    z-index: 20; border: none;
+  }
+  #btn-theme-join:active { transform: scale(.94); }
+  [data-theme="dark"] #btn-theme-join { background: rgba(39,39,42,.94); color: #f3f4f6; }
 /* ========== 暗色模式 ========== */
 [data-theme="dark"] {
   color-scheme: dark;
@@ -599,6 +609,7 @@
 
 <!-- ================= 进房页 ================= -->
 <div id="view-join">
+  <button id="btn-theme-join" type="button" title="切换明暗主题">🌙</button>
   <div class="join-card">
     <h1>课堂讨论室 · 教师端</h1>
     <p class="sub">教师专用：发公告、上屏学生发言、管理文件</p>
@@ -2101,12 +2112,17 @@ function bindRoom() {
     updateThemeIcon();
   }
   function updateThemeIcon() {
-    var btn = $("btn-theme");
-    if (!btn) return;
-    btn.textContent = document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
+    var icon = document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
+    ["btn-theme", "btn-theme-join"].forEach(function (id) {
+      var b = $(id);
+      if (b) b.textContent = icon;
+    });
   }
   $("btn-theme").onclick = toggleTheme;
+  var joinThemeBtn = $("btn-theme-join");
+  if (joinThemeBtn) joinThemeBtn.onclick = toggleTheme;
   initTheme();
+  updateThemeIcon();
   $("btn-settings").onclick = function () {
     $("st-words").value = S.words;
     $("st-filter-on").checked = S.filterOn;
