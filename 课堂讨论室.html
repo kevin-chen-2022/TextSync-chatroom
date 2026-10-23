@@ -150,8 +150,9 @@
   }
   #notice-edit.show { display: flex; }
   #notice-input {
-    flex: 1; resize: none; border: 2px solid #fde68a; border-radius: 10px;
+    flex: 1; resize: vertical; border: 2px solid #fde68a; border-radius: 10px;
     padding: 8px 10px; font-size: var(--msg-size); min-height: 40px; max-height: 160px; background: #fff;
+    cursor: ns-resize;
   }
   #notice-input:focus { border-color: var(--warn); }
   .ne-col { display: flex; flex-direction: column; gap: 6px; }
@@ -385,10 +386,10 @@
   .img-cap { font-size: var(--msg-size); line-height: 1.5; padding: 6px 4px 2px; white-space: pre-wrap; word-break: break-word; }
   .img-up { font-size: 14px; padding: 4px 2px; }
   #msg-input {
-    flex: 1; resize: none; border: 2px solid var(--line); border-radius: 12px;
+    flex: 1; resize: vertical; border: 2px solid var(--line); border-radius: 12px;
     padding: 10px 12px; font-size: 16px; line-height: 1.5;
     min-height: 46px; max-height: 130px; background: var(--bg);
-    transition: border-color .15s;
+    transition: border-color .15s; cursor: ns-resize;
   }
   #msg-input:focus { border-color: var(--pink); background: #fff; }
   #btn-send {
@@ -604,6 +605,16 @@
 [data-theme="dark"] textarea { color: #f3f4f6; }
 [data-theme="dark"] #toast { background: rgba(243, 244, 246, .92); color: #111318; }
 [data-theme="dark"] #conn-tip { background: #ef4444; color: #fff; }
+
+/* 触屏设备：加大 textarea 底部区域，方便手指拖拽调整高度 */
+@media (pointer: coarse) {
+  #msg-input, #notice-input {
+    padding-bottom: 22px;
+    cursor: default;
+  }
+  #msg-input { max-height: 50vh; }
+  #notice-input { max-height: 35vh; }
+}
 </style>
 </head>
 <body>
