@@ -146,37 +146,10 @@
     border-radius: 6px; padding: 2px 7px; margin-top: 2px;
   }
   #notice-text { flex: 1; font-size: var(--msg-size); line-height: 1.55; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
-  #notice-fold, #btn-notice-edit { flex: none; background: none; color: var(--muted); font-size: 12px; padding: 4px; }
+  #notice-fold, #btn-notice-clear { flex: none; background: none; color: var(--muted); font-size: 12px; padding: 4px; }
+  #btn-notice-clear { color: #b45309; font-weight: 700; }
   #notice-bar.empty #notice-text { color: var(--muted); font-weight: 400; }
   #notice-bar.folded #notice-text { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-
-  /* 教师公告编辑 */
-  #notice-edit {
-    flex: none; display: none; gap: 8px; padding: 8px 12px;
-    background: #fffbeb; border-bottom: 1px solid #fde68a;
-  }
-  #notice-edit.show { display: flex; }
-  #notice-input {
-    flex: 1; resize: vertical; border: 2px solid #fde68a; border-radius: 10px;
-    padding: 8px 10px; font-size: var(--msg-size); min-height: 40px; max-height: 160px; background: #fff;
-    cursor: ns-resize;
-  }
-  #notice-input:focus { border-color: var(--warn); }
-  .ne-col { display: flex; flex-direction: column; gap: 6px; }
-  .ne-wrap { flex: 1; position: relative; display: flex; }
-  .ne-btn {
-    padding: 8px 14px; border-radius: 9px; font-size: 14px; font-weight: 700;
-    background: var(--warn); color: #fff;
-  }
-  .ne-btn.gray { background: var(--line); color: var(--muted); }
-  /* 公告实时预览条：显示含行内着色 / 整条着色的公告效果 */
-  #n-preview {
-    flex: none; display: none; padding: 6px 12px;
-    background: #fffbeb; border-bottom: 1px solid #fde68a;
-    font-size: var(--msg-size); line-height: 1.5;
-    white-space: pre-wrap; word-break: break-word; max-height: 88px; overflow: auto;
-  }
-  #n-preview.show { display: block; }
 
   /* 筛选条（分类查看 + 关键词搜索，默认隐藏，点工具栏「筛选」展开） */
   #filter-bar {
@@ -318,6 +291,7 @@
   }
   .type-btn.on-q { border-color: #f97316; color: #c2410c; background: #fff7ed; }
   .type-btn.on-a { border-color: #10b981; color: #15803d; background: #f0fdf4; }
+  .type-btn.on-n { border-color: #d97706; color: #b45309; background: #fffbeb; }
   .type-btn.mini { color: #9ca3af; border-style: dashed; }
   .char-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
   .tool-wrap { position: relative; flex: none; }   /* 给 composer-pop 提供定位基准 */
@@ -406,6 +380,10 @@
     box-shadow: 0 4px 12px rgba(236,72,153,.35);
   }
   #btn-send:disabled { opacity: .5; box-shadow: none; }
+  #btn-send.notice-mode {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+    box-shadow: 0 4px 12px rgba(217,119,6,.35);
+  }
 
   /* 过滤弹层 */
   #settings-mask {
@@ -522,14 +500,8 @@
 [data-theme="dark"] #notice-bar { background: linear-gradient(90deg, #2a1f12, #2a2315); border-bottom-color: #5c4a1f; }
 [data-theme="dark"] #notice-text { color: #f3f4f6; }
 [data-theme="dark"] #notice-bar.empty #notice-text,
-[data-theme="dark"] #notice-fold,
-[data-theme="dark"] #btn-notice-edit { color: #9ca3af; }
-[data-theme="dark"] #notice-edit,
-[data-theme="dark"] #n-preview { background: #1f1a12; border-bottom-color: #5c4a1f; }
-[data-theme="dark"] #notice-input { background: #18181b; border-color: #5c4a1f; color: #f3f4f6; }
-[data-theme="dark"] #notice-input:focus { border-color: #f59e0b; background: #27272a; }
-[data-theme="dark"] .ne-btn.gray { background: #374151; color: #f3f4f6; }
-[data-theme="dark"] .ne-hint { color: #9ca3af; }
+[data-theme="dark"] #notice-fold { color: #9ca3af; }
+[data-theme="dark"] #btn-notice-clear { color: #fbbf24; }
 [data-theme="dark"] #filter-bar { background: #18181b; border-bottom-color: #374151; }
 [data-theme="dark"] .seg-btn { background: #18181b; border-color: #374151; color: #9ca3af; }
 [data-theme="dark"] .seg-btn.on { background: #f59e0b; border-color: #f59e0b; color: #111318; }
@@ -570,6 +542,7 @@
 [data-theme="dark"] .type-btn { background: #18181b; border-color: #374151; color: #9ca3af; }
 [data-theme="dark"] .type-btn.on-q { background: #2a1f12; border-color: #f97316; color: #fdba74; }
 [data-theme="dark"] .type-btn.on-a { background: #0f291e; border-color: #10b981; color: #6ee7b7; }
+[data-theme="dark"] .type-btn.on-n { background: #2a1f0a; border-color: #d97706; color: #fcd34d; }
 [data-theme="dark"] .type-btn.mini,
 [data-theme="dark"] .char-count { color: #9ca3af; }
 [data-theme="dark"] #input-preview,
@@ -615,12 +588,11 @@
 
 /* 触屏设备：加大 textarea 底部区域，方便手指拖拽调整高度 */
 @media (pointer: coarse) {
-  #msg-input, #notice-input {
+  #msg-input {
     padding-bottom: 22px;
     cursor: default;
   }
   #msg-input { max-height: 50vh; }
-  #notice-input { max-height: 35vh; }
 }
 
   /* 关于弹窗 */
@@ -725,33 +697,12 @@
     <button class="tb-btn" id="btn-about" type="button" title="关于本工具">关于</button>
   </div>
 
-  <!-- 教师公告
-  </div>
-
-  <!-- 教师公告（置顶显示，不随消息滚动） -->
+  <!-- 教师公告（置顶显示，不随消息滚动；无公告时整条隐藏） -->
   <div id="notice-bar">
     <span class="n-tag">公告</span>
     <div id="notice-text"></div>
     <button id="notice-fold" type="button">收起</button>
-    <button id="btn-notice-edit" type="button" title="编辑公告">✏️</button>
-  </div>
-
-  <!-- 公告实时预览条（位于编辑条上方） -->
-  <div id="n-preview"></div>
-  <!-- 教师公告编辑条 -->
-  <div id="notice-edit">
-    <button class="icon-btn" id="btn-notice-emoji" type="button" title="插入表情">😊</button>
-    <button class="icon-btn" id="btn-notice-color" type="button" title="公告文字颜色"><span class="dot"></span></button>
-    <div class="ne-wrap">
-      <textarea id="notice-input" maxlength="200" placeholder="输入公告内容（最多 200 字），发布后全班置顶；撤下请点右侧按钮"></textarea>
-      <div class="composer-pop" id="n-pop-emoji"><div class="emoji-grid" id="n-emoji-grid"></div></div>
-      <div class="composer-pop" id="n-pop-color"><div class="pop-hint">公告的文字颜色</div><div class="sw-row" id="n-swatch-row"></div></div>
-    </div>
-    <div class="ne-col">
-      <button class="ne-btn" id="btn-notice-send" type="button">发布公告</button>
-      <button class="ne-btn gray" id="btn-notice-clear" type="button">撤下公告</button>
-      <button class="ne-btn gray" id="btn-notice-cancel" type="button">取消编辑</button>
-    </div>
+    <button id="btn-notice-clear" type="button" title="撤下公告">撤下</button>
   </div>
 
   <!-- 筛选条：分类查看 + 关键词搜索 -->
@@ -783,6 +734,7 @@
       <button class="type-btn on" id="type-normal" type="button">发言</button>
       <button class="type-btn" id="type-question" type="button">提问</button>
       <button class="type-btn" id="type-answer" type="button">回答</button>
+      <button class="type-btn" id="type-notice" type="button" title="发布/修改公告，全班置顶">公告</button>
       <button id="btn-file" type="button" title="发送文件 / 图片（图片限 10MB，大图自动压缩）"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
       <div class="tool-wrap">
         <button class="icon-btn" id="btn-color" type="button" title="消息文字颜色"><span class="dot"></span></button>
@@ -794,7 +746,7 @@
       </div>
       <button class="type-btn mini" id="btn-paste" type="button" title="从剪贴板粘贴">粘贴</button>
       <button class="type-btn mini" id="btn-wipe" type="button" title="清空输入框">清空</button>
-      <span class="char-count"><span id="char-num">0</span>/300</span>
+      <span class="char-count"><span id="char-num">0</span>/<span id="char-max">300</span></span>
     </div>
     <div id="input-preview"></div>
     <div class="input-row">
@@ -934,7 +886,7 @@ var S = {
   fileCache: {},                    // 房间文件缓存 id → {id,name,size,uid,username}（教师重发用）
   replayedTo: {},                   // 公告重发记录（每次进房重置）
   fileReplayedTo: {},               // 文件列表重发记录
-  msgType: "normal",                // normal | question | answer
+  msgType: "normal",                // normal | question | answer | notice
   msgColor: "",                     // 输入区当前文字颜色（"" = 默认）
   noticeColor: "",                  // 当前公告颜色（"" = 默认）
   fontSize: 18,
@@ -945,6 +897,8 @@ var S = {
 };
 
 var $ = function (id) { return document.getElementById(id); };
+var MSG_DRAFT = "";     // 发言草稿（切到「公告」时暂存，切回自动恢复）
+var NOTICE_DRAFT = "";  // 公告草稿（切回「发言」时暂存）
 
 /* ---------- 工具 ---------- */
 function esc(t) {
@@ -983,16 +937,49 @@ function fallbackCopy(t) {
   catch (e) { toast("复制失败，请手动复制"); }
   document.body.removeChild(ta);
 }
-/* 消息类型切换（发言 / 提问 / 回答） */
+/* 消息类型切换（发言 / 提问 / 回答 / 公告）；公告复用同一输入框，草稿互相隔离 */
 function setType(t) {
+  if (t === S.msgType) return;
+  var input = $("msg-input");
+  var wasNotice = S.msgType === "notice";
+  var willNotice = t === "notice";
+  if (wasNotice && !willNotice) {
+    NOTICE_DRAFT = input.value;            // 公告草稿暂存
+    input.value = MSG_DRAFT;               // 恢复发言草稿
+  } else if (!wasNotice && willNotice) {
+    MSG_DRAFT = input.value;               // 发言草稿暂存
+    input.value = NOTICE_DRAFT || S.notice || "";  // 回填公告草稿或当前公告
+  }
   S.msgType = t;
   $("type-normal").classList.toggle("on", t === "normal");
   $("type-question").classList.toggle("on-q", t === "question");
   $("type-answer").classList.toggle("on-a", t === "answer");
-  $("msg-input").placeholder =
-    t === "question" ? "输入你的问题，老师会优先看到" :
-    t === "answer"   ? "输入你的回答，全班都能看到" :
-    "想好再发，点击「发送」或按 Ctrl+Enter";
+  $("type-notice").classList.toggle("on-n", t === "notice");
+  var sendBtn = $("btn-send");
+  if (willNotice) {
+    input.maxLength = 200;
+    input.placeholder = "编辑公告（最多 200 字），发布后全班置顶";
+    input.style.color = S.noticeColor || "";
+    setDot($("btn-color"), S.noticeColor || "");
+    sendBtn.textContent = "发布公告";
+    sendBtn.classList.add("notice-mode");
+    $("btn-file").style.display = "none";   // 公告只发文字
+  } else {
+    input.maxLength = 300;
+    input.placeholder =
+      t === "question" ? "输入你的问题，老师会优先看到" :
+      t === "answer"   ? "输入你的回答，全班都能看到" :
+      "想好再发，点击「发送」或按 Ctrl+Enter";
+    input.style.color = S.msgColor || "";
+    setDot($("btn-color"), S.msgColor || "");
+    sendBtn.textContent = "发 送";
+    sendBtn.classList.remove("notice-mode");
+    $("btn-file").style.display = "";
+  }
+  $("char-num").textContent = input.value.length;
+  $("char-max").textContent = willNotice ? "200" : "300";
+  updatePreview();
+  input.focus();
 }
 
 /* ---------- 富文本辅助（表情面板 / 颜色面板） ---------- */
@@ -1097,25 +1084,13 @@ function updatePreview() {
   var pv = $("input-preview");
   if (!pv) return;
   var v = $("msg-input").value;
-  if (!v || (!/\u200bC#[0-9a-fA-F]{6}\u200b/.test(v) && !S.msgColor)) {
+  var col = S.msgType === "notice" ? S.noticeColor : S.msgColor;
+  if (!v || (!/\u200bC#[0-9a-fA-F]{6}\u200b/.test(v) && !col)) {
     pv.classList.remove("show");
     return;
   }
   pv.innerHTML = renderRich(v);
-  pv.style.color = S.msgColor || "";
-  pv.classList.add("show");
-}
-/* 公告编辑实时预览条：逻辑同 updatePreview，读公告编辑框与公告整条色 */
-function updateNoticePreview() {
-  var pv = $("n-preview");
-  if (!pv) return;
-  var v = $("notice-input").value;
-  if (!v || (!/\u200bC#[0-9a-fA-F]{6}\u200b/.test(v) && !S.noticeColor)) {
-    pv.classList.remove("show");
-    return;
-  }
-  pv.innerHTML = renderRich(v);
-  pv.style.color = S.noticeColor || "";
+  pv.style.color = col || "";
   pv.classList.add("show");
 }
 /* 随机生成 5 位合格房间号：避开易混淆字符（0/O、1/I/L），便于课堂口头传达 */
@@ -1457,9 +1432,9 @@ function renderMsg(msg) {
       copyText(displayName(msg.name) + "：" + stripMark(msg.text));
     };
     acts.querySelector(".fwd-btn").onclick = function () {
+      setType(msg.type === "question" ? "question" : (msg.type === "answer" ? "answer" : "normal"));
       var input = $("msg-input");
       input.value = msg.text;
-      setType(msg.type === "question" ? "question" : (msg.type === "answer" ? "answer" : "normal"));
       $("char-num").textContent = input.value.length;
       input.focus();
       updatePreview();
@@ -1741,17 +1716,11 @@ function maybeReplayNotice(name) {
   }, 1000);
 }
 function renderNotice(alsoToast) {
-  /* 教师：公告显示/编辑两态切换（✏️ 进入源码编辑，发布/撤下/取消回到显示）；
+  /* 教师：公告只读展示（无公告时整条隐藏），编辑走输入区「公告」按钮；
      学生：仍走置顶公告条 */
   if (S.isTeacher) {
-    /* 显示/编辑两态：编辑条展开时隐藏公告条；平时公告条以渲染效果常驻（点 ✏️ 进入源码编辑） */
-    var ta = $("notice-input");
-    var editing = $("notice-edit").classList.contains("show");
     var nbar = $("notice-bar");
-    if (editing) {
-      nbar.classList.remove("show");
-      if (document.activeElement !== ta) ta.value = S.notice; // 正在输入时不覆盖
-    } else if (S.notice) {
+    if (S.notice) {
       nbar.classList.add("show");
       nbar.classList.remove("empty");
       nbar.classList.remove("folded");
@@ -1759,15 +1728,8 @@ function renderNotice(alsoToast) {
       $("notice-text").innerHTML = renderRich(S.notice);   // 渲染富文本效果（renderRich 先 esc 防注入）
       $("notice-text").style.color = S.noticeColor || "";
     } else {
-      nbar.classList.add("show");
-      nbar.classList.add("empty");
-      nbar.classList.remove("folded");
-      $("notice-fold").textContent = "收起";
-      $("notice-text").textContent = "暂无公告，点右侧 ✏️ 编辑";
-      $("notice-text").style.color = "";
+      nbar.classList.remove("show");
     }
-    ta.style.color = S.noticeColor || "";
-    setDot($("btn-notice-color"), S.noticeColor || "");
     if (alsoToast) toast(S.notice ? "收到新公告" : "公告已被撤下");
     return;
   }
@@ -1897,6 +1859,7 @@ function bindRoom() {
   $("type-normal").onclick = function () { setType("normal"); };
   $("type-question").onclick = function () { setType("question"); };
   $("type-answer").onclick = function () { setType("answer"); };
+  $("type-notice").onclick = function () { setType("notice"); };
 
   /* 清空 / 粘贴 */
   $("btn-wipe").onclick = function () {
@@ -1929,6 +1892,7 @@ function bindRoom() {
           }
         }
         if (imgItem) {                       // 剪贴板是图片：直接无感上传
+          if (S.msgType === "notice") { toast("公告只能发文字"); return; }
           return imgItem.getType(imgType).then(function (blob) {
             var ext = (imgType.split("/")[1] || "png").toLowerCase();
             if (ext === "jpeg") ext = "jpg";
@@ -1946,7 +1910,7 @@ function bindRoom() {
     navigator.clipboard.readText().then(pasteText).catch(function () { toast("读取剪贴板失败，请用 Ctrl+V"); });
   };
 
-  /* 表情 / 颜色浮层（对话输入 + 公告编辑共用一套构建函数） */
+  /* 表情 / 颜色浮层（发言与公告共用一套构建函数，颜色按当前类型分别记录） */
   buildEmojiGrid($("emoji-grid"), function (em) {
     insertAtCursor(input, em);
     $("char-num").textContent = input.value.length;
@@ -1961,28 +1925,11 @@ function bindRoom() {
       updatePreview();
       return;
     }
-    S.msgColor = c;                            // 未选（或点默认色）：整条消息一色
+    if (S.msgType === "notice") S.noticeColor = c;   // 未选（或点默认色）：整条一色
+    else S.msgColor = c;
     setDot($("btn-color"), c);
     input.style.color = c || "";
     updatePreview();
-  });
-  var nInput = $("notice-input");
-  nInput.addEventListener("input", updateNoticePreview);
-  buildEmojiGrid($("n-emoji-grid"), function (em) {
-    insertAtCursor(nInput, em);
-    nInput.focus();
-    updateNoticePreview();
-  });
-  buildSwatches($("n-swatch-row"), function (c) {
-    $("n-pop-color").classList.remove("show");
-    if (c && insertWrap(nInput, c)) {          // 已选中文字：包裹选区（公告也支持一段多色）
-      updateNoticePreview();
-      return;
-    }
-    S.noticeColor = c;                         // 未选（或点默认色）：整条公告一色
-    setDot($("btn-notice-color"), c);
-    nInput.style.color = c || "";
-    updateNoticePreview();
   });
   function togglePop(btn, popId) {
     btn.onclick = function (e) {
@@ -1996,8 +1943,6 @@ function bindRoom() {
   }
   togglePop($("btn-emoji"), "pop-emoji");
   togglePop($("btn-color"), "pop-color");
-  togglePop($("btn-notice-emoji"), "n-pop-emoji");
-  togglePop($("btn-notice-color"), "n-pop-color");
   /* 从其他程序粘贴：带图片时确认后走发图链路；带 text/html 时提取颜色转为包裹标记 */
   input.addEventListener("paste", function (e) {
     var items = e.clipboardData && e.clipboardData.items;
@@ -2007,6 +1952,7 @@ function bindRoom() {
           var pf = items[pi].getAsFile();
           if (pf) {                                // 无感上传：粘贴即发送（复用压缩/上限链路）
             e.preventDefault();
+            if (S.msgType === "notice") { toast("公告只能发文字"); return; }
             sendImage(pf);
           }
           break;                                   // 只处理首个图片项；无文件时继续走下方文本粘贴
@@ -2100,42 +2046,18 @@ function bindRoom() {
   });
   $("srch-close").onclick = closeFilter;
 
-  /* 公告（教师：显示/编辑两态，发布或撤下后自动回到显示模式） */
-  $("btn-notice-edit").onclick = function () {
-    $("notice-edit").classList.add("show");
-    renderNotice(false);                       // 隐藏公告条并回填当前公告源码
-    var ta = $("notice-input");
-    ta.focus();
-    ta.setSelectionRange(ta.value.length, ta.value.length);
-    updateNoticePreview();
-  };
-  function exitNoticeEdit() {
-    $("notice-edit").classList.remove("show");
-    $("n-preview").classList.remove("show");
-    renderNotice(false);
-  }
-  $("btn-notice-send").onclick = function () {
-    var t = $("notice-input").value.trim();
-    if (!t) { toast("公告内容不能为空"); return; }
-    var npre = S.noticeColor ? ("\u200bC" + S.noticeColor + "\u200b") : "";
-    if (safeSend({ type: "message", data: { message: MARK_A + npre + t, time: Date.now() } })) {
-      S.notice = t;
-      exitNoticeEdit();
-      toast("公告已发布");
-    }
-  };
+  /* 公告：编辑合并进输入区「公告」模式；公告条只负责展示与撤下 */
   $("btn-notice-clear").onclick = function () {
     if (!S.notice) { toast("当前没有公告"); return; }
     if (safeSend({ type: "message", data: { message: MARK_A, time: Date.now() } })) {
       S.notice = "";
       S.noticeColor = "";
-      $("notice-input").style.color = "";
-      setDot($("btn-notice-color"), "");
-      exitNoticeEdit();
+      if (S.msgType === "notice") setType("normal");
+      NOTICE_DRAFT = "";
+      renderNotice(false);
       toast("公告已撤下");
     }
   };
-  $("btn-notice-cancel").onclick = exitNoticeEdit;
   $("notice-fold").onclick = function () {
     var bar = $("notice-bar");
     bar.classList.toggle("folded");
@@ -2262,7 +2184,24 @@ function setFont(px) {
   document.documentElement.style.setProperty("--msg-size", S.fontSize + "px");
   saveLS();
 }
+/* 发布公告：复用输入框内容，成功后清空公告草稿并回到「发言」 */
+function publishNotice() {
+  var input = $("msg-input");
+  var t = input.value.trim();
+  if (!t) { toast("公告内容不能为空"); return; }
+  if (t.length > 200) { toast("公告最多 200 字"); return; }
+  var npre = S.noticeColor ? ("\u200bC" + S.noticeColor + "\u200b") : "";
+  if (!safeSend({ type: "message", data: { message: MARK_A + npre + t, time: Date.now() } })) return;
+  S.notice = t;
+  NOTICE_DRAFT = "";
+  input.value = "";
+  $("char-num").textContent = "0";
+  setType("normal");                 // 公告草稿不保留，回到发言（发言草稿自动恢复）
+  renderNotice(false);
+  toast("公告已发布");
+}
 function sendMsg() {
+  if (S.msgType === "notice") { publishNotice(); return; }
   var input = $("msg-input");
   var text = input.value.trim();
   if (!text) { toast("先输入内容再发送"); return; }
