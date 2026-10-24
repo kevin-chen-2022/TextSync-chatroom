@@ -53,6 +53,14 @@
     border: 2px solid var(--line); border-radius: 10px; transition: border-color .15s;
   }
   .field input:focus { border-color: var(--pink); }
+  .remember-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    font-size: 13px; color: var(--muted); cursor: pointer; user-select: none;
+  }
+  .remember-row input[type="checkbox"] {
+    width: 16px; height: 16px; padding: 0; margin: 0; flex: none;
+    border: none; accent-color: var(--pink); cursor: pointer;
+  }
   .room-row { display: flex; gap: 8px; }
   .room-row input { flex: 1; min-width: 0; }
   .rnd-btn {
@@ -691,7 +699,8 @@
     </div>
     <div class="field" id="teacher-key-wrap">
       <label>教师口令</label>
-      <input id="in-key" type="password" maxlength="12" placeholder="默认 1234，可向管理员索取" autocomplete="off">
+      <input id="in-key" type="password" maxlength="12" placeholder="请输入教师口令（默认 1234）" autocomplete="current-password">
+      <label class="remember-row"><input type="checkbox" id="chk-remember"> <span>记住口令（下次自动填充）</span></label>
     </div>
     <button id="btn-join" type="button">进入讨论</button>
     <p class="join-err" id="join-err"></p>
@@ -1834,6 +1843,15 @@ function bindJoin() {
   else { try { $("in-room").value = localStorage.getItem("cr_room") || ""; } catch (e) {} }
   if (q.get("name")) $("in-name").value = q.get("name").slice(0, 12);
   else { try { $("in-name").value = localStorage.getItem("cr_name") || ""; } catch (e) {} }
+
+  /* 记住口令：已保存则回填并勾选；取消勾选立即清除 */
+  var chk = $("chk-remember");
+  var savedKey = null;
+  try { savedKey = localStorage.getItem("cr_pwd"); } catch (e) {}
+  if (savedKey) { $("in-key").value = savedKey; if (chk) chk.checked = true; }
+  if (chk) chk.onchange = function () {
+    if (!chk.checked) { try { localStorage.removeItem("cr_pwd"); } catch (e) {} }
+  };
 }
 function doJoin() {
   var room = $("in-room").value.trim().replace(/[^a-zA-Z0-9]/g, "");
@@ -1843,6 +1861,15 @@ function doJoin() {
   if (!/^[a-zA-Z0-9]{5}$/.test(room)) { err.textContent = "房间号必须是 5 位字母或数字"; return; }
   if (!name) { err.textContent = "请填写名字"; return; }
   if (pickTeacher && $("in-key").value !== TEACHER_KEY) { err.textContent = "教师口令不正确"; return; }
+
+  /* 勾选记住 → 保存口令；未勾选 → 清除已保存口令 */
+  if (pickTeacher) {
+    var chkPwd = $("chk-remember");
+    try {
+      if (chkPwd && chkPwd.checked) localStorage.setItem("cr_pwd", $("in-key").value);
+      else localStorage.removeItem("cr_pwd");
+    } catch (e) {}
+  }
 
   S.room = room;
   S.isTeacher = pickTeacher;
