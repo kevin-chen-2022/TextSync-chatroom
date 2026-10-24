@@ -392,7 +392,7 @@
   }
   #btn-send:disabled { opacity: .5; box-shadow: none; }
 
-  /* 设置弹层 */
+  /* 过滤弹层 */
   #settings-mask {
     display: none; position: fixed; inset: 0; z-index: 80;
     background: rgba(0,0,0,.35);
@@ -696,7 +696,7 @@
     </div>
     <button class="tb-btn" id="btn-filter" type="button" title="分类查看（问答/文件/图片）与关键词搜索">筛选</button>
     <button class="tb-btn" id="btn-theme" type="button" title="切换明暗主题">🌙</button>
-    <button class="tb-btn" id="btn-settings" type="button">设置</button>
+    <button class="tb-btn" id="btn-settings" type="button" title="过滤敏感词">过滤</button>
     <button class="tb-btn" id="btn-export" type="button">导出</button>
     <button class="tb-btn" id="btn-clear" type="button">清屏</button>
     <button class="tb-btn" id="btn-about" type="button" title="关于本工具">关于</button>
@@ -786,7 +786,7 @@
   </div>
 </div>
 
-<!-- 设置弹层 -->
+<!-- 过滤弹层 -->
 
 <!-- 关于弹窗 -->
 <div id="about-mask">
@@ -816,7 +816,7 @@
 
 <div id="settings-mask">
   <div class="settings-card">
-    <h3>设置</h3>
+    <h3>过滤</h3>
     <p class="settings-tip">敏感词（用逗号分隔）。发送时自动替换为 **，此列表仅保存在本机、只过滤自己的发言。已内置一份基础列表。</p>
     <div class="settings-row">
       <span>启用敏感词过滤</span>
@@ -2134,7 +2134,7 @@ function bindRoom() {
     }
   });
 
-  /* 设置 */
+  /* 过滤 */
   // 明暗主题切换
   function initTheme() {
     if (localStorage.getItem("classroom-theme") === "dark") {
@@ -2176,7 +2176,7 @@ function bindRoom() {
     S.filterOn = $("st-filter-on").checked;
     saveLS();
     $("settings-mask").classList.remove("show");
-    toast("设置已保存（仅本机生效）");
+    toast("过滤规则已保存（仅本机生效）");
   };
   $("settings-mask").addEventListener("click", function (e) {
     if (e.target === this) this.classList.remove("show");

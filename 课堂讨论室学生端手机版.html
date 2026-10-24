@@ -461,7 +461,7 @@
   }
   #btn-send:disabled { opacity: .5; box-shadow: none; }
 
-  /* 设置弹层 */
+  /* 过滤弹层 */
   #settings-mask {
     display: none; position: fixed; inset: 0; z-index: 80;
     background: rgba(0,0,0,.35);
@@ -538,6 +538,26 @@
   .fs-btn { width: 34px; height: 34px; font-size: 13px; }
   #fs-reset { width: auto; padding: 0 8px; font-size: 12px; }
   .tb-tools { gap: 5px; }
+  /* 单行顶栏：只在极窄屏压缩内边距，保证按钮不换行 */
+  #topbar { white-space: nowrap; }
+  #topbar .tb-line { flex-wrap: nowrap; overflow: hidden; }
+  .tb-room { font-size: 14px; flex: none; }
+  .tb-room small { display: none; }
+  .tb-btn { padding: 7px 8px; }
+  /* 更多菜单里的字号行 */
+  .more-fs { display: flex; align-items: center; gap: 8px; padding: 8px 12px 6px; }
+  .more-fs-label { font-size: 13px; color: var(--muted); }
+  .more-fs-btns { display: flex; gap: 4px; margin-left: auto; }
+  .more-fs .fs-btn { width: 30px; height: 30px; font-size: 12px; }
+  .more-fs #fs-reset { width: auto; padding: 0 6px; }
+  #more-pop { min-width: 178px; }
+  /* 极窄屏（≤340px）进一步压缩，保证 7 个顶栏按钮全部可见 */
+  @media (max-width: 340px) {
+    .tb-line { gap: 4px; }
+    .tb-btn { padding: 7px 6px; font-size: 11px; }
+    .tb-room { font-size: 13px; }
+    #topbar .dot { display: none; }
+  }
 
   /* 公告显示条 */
   #notice-bar { padding: 7px 10px; gap: 6px; }
@@ -594,7 +614,7 @@
   .emoji-item { width: 30px; height: 30px; font-size: 18px; }
   .sw { width: 30px; height: 30px; }
 
-  /* 设置 / 成员浮层 / 图片预览 / 提示 */
+  /* 过滤 / 成员浮层 / 图片预览 / 提示 */
   .settings-card { max-height: 86dvh; padding: 16px; }
   #member-pop { max-width: 84vw; max-height: 60dvh; }
   #lb-img { max-height: 74dvh; }
@@ -607,16 +627,6 @@
     .type-btn { padding: 7px 9px; font-size: 13px; }
     #btn-send { padding: 11px 10px; font-size: 14px; }
   }
-  /* 进房页右上角明暗切换（房间内顶栏另有按钮） */
-  #btn-theme-join {
-    position: fixed; top: 16px; right: 16px; width: 42px; height: 42px;
-    border-radius: 50%; background: rgba(255,255,255,.94); color: #374151;
-    font-size: 18px; line-height: 1; display: flex; align-items: center;
-    justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.18);
-    z-index: 20; border: none;
-  }
-  #btn-theme-join:active { transform: scale(.94); }
-  [data-theme="dark"] #btn-theme-join { background: rgba(39,39,42,.94); color: #f3f4f6; }
 /* ========== 暗色模式 ========== */
 [data-theme="dark"] {
   color-scheme: dark;
@@ -825,7 +835,6 @@
 
 <!-- ================= 进房页 ================= -->
 <div id="view-join">
-  <button id="btn-theme-join" type="button" title="切换明暗主题">🌙</button>
   <div class="join-card">
     <h1>课堂讨论室 · 学生端</h1>
     <p class="sub">输入房间号，发言提问、下载老师发的文件</p>
@@ -849,33 +858,33 @@
 <!-- ================= 讨论页 ================= -->
 <div id="view-room">
 
-  <!-- 顶栏（手机版两行布局） -->
+  <!-- 顶栏（单行：房间号 / 成员 / 过滤 / 筛选 / 清屏 / 主题 / 更多） -->
   <div id="topbar">
     <div class="tb-line">
-      <div class="tb-room"><small>房间号</small><span id="tb-room-id">-----</span></div>
+      <div class="tb-room" title="房间号"><span id="tb-room-id">-----</span></div>
       <span class="dot" id="conn-dot"></span>
+      <button class="tb-btn" id="tb-members" type="button" title="查看成员">成员 1</button>
       <span class="tb-spacer"></span>
+      <button class="tb-btn" id="btn-settings" type="button" title="过滤敏感词">过滤</button>
+      <button class="tb-btn" id="btn-filter" type="button" title="分类查看（问答/文件/图片）与关键词搜索">筛选</button>
+      <button class="tb-btn" id="btn-clear" type="button">清屏</button>
       <button class="tb-btn" id="btn-theme" type="button" title="切换明暗主题">🌙</button>
       <button class="tb-btn" id="btn-more" type="button" title="更多">⋮</button>
-      <button class="tb-btn" id="btn-about" type="button" title="关于本工具">关于</button>
-    </div>
-    <div class="tb-line tb-tools">
-    </div>
-    <div class="tb-line tb-tools" title="调整消息字号">
-      <button class="fs-btn" id="fs-minus" type="button">A-</button>
-      <button class="fs-btn" id="fs-plus" type="button">A+</button>
-      <button class="fs-btn" id="fs-reset" type="button">重置</button>
-      <span class="tb-spacer"></span>
-      <button class="tb-btn" id="btn-filter" type="button" title="分类查看（问答/文件/图片）与关键词搜索">筛选</button>
-      <button class="tb-btn" id="btn-export" type="button">导出</button>
-      <button class="tb-btn" id="btn-clear" type="button">清屏</button>
     </div>
   </div>
 
-  <!-- 更多菜单（成员 / 设置 / 退出） -->
+  <!-- 更多菜单（字号 / 导出 / 关于 / 退出） -->
   <div id="more-pop">
-    <button class="more-item" id="more-members" type="button">成员 <span id="more-members-count">1</span></button>
-    <button class="more-item" id="more-settings" type="button">设置</button>
+    <div class="more-fs">
+      <span class="more-fs-label">字号</span>
+      <div class="more-fs-btns">
+        <button class="fs-btn" id="fs-minus" type="button">A-</button>
+        <button class="fs-btn" id="fs-plus" type="button">A+</button>
+        <button class="fs-btn" id="fs-reset" type="button">重置</button>
+      </div>
+    </div>
+    <button class="more-item" id="btn-export" type="button">导出记录</button>
+    <button class="more-item" id="btn-about" type="button">关于本工具</button>
     <button class="more-item danger" id="more-leave" type="button">退出房间</button>
   </div>
 
@@ -986,7 +995,7 @@
   </div>
 </div>
 
-<!-- 设置弹层 -->
+<!-- 过滤弹层 -->
 
 <!-- 关于弹窗 -->
 <div id="about-mask">
@@ -1016,7 +1025,7 @@
 
 <div id="settings-mask">
   <div class="settings-card">
-    <h3>设置</h3>
+    <h3>过滤</h3>
     <p class="settings-tip">敏感词（用逗号分隔）。发送时自动替换为 **，此列表仅保存在本机、只过滤自己的发言。已内置一份基础列表。</p>
     <div class="settings-row">
       <span>启用敏感词过滤</span>
@@ -1951,7 +1960,7 @@ function pinToScreen(name, text) {
 function renderMembers() {
   var names = Object.keys(S.members);
   var count = names.length;
-  $("more-members-count").textContent = count;
+  $("tb-members").textContent = "成员 " + count;
   var box = $("member-list");
   box.innerHTML = "";
   names.sort(function (a, b) {
@@ -2430,8 +2439,15 @@ function bindRoom() {
     }
   });
 
-  /* 成员浮层 */
-  $("more-members").onclick = function (e) {
+  /* 更多菜单：点普通菜单项后自动收起（字号按钮除外，方便连点） */
+  $("more-pop").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b || b.classList.contains("fs-btn")) return;
+    $("more-pop").classList.remove("show");
+  });
+
+  /* 成员浮层（顶栏「成员」按钮） */
+  $("tb-members").onclick = function (e) {
     $("more-pop").classList.remove("show");
     var pop = $("member-pop");
     var open = pop.style.display === "block";
@@ -2440,7 +2456,7 @@ function bindRoom() {
   };
   document.addEventListener("click", function (e) {
     var pop = $("member-pop");
-    if (pop.style.display === "block" && !pop.contains(e.target) && e.target.id !== "more-members" && !e.target.closest("#more-pop")) {
+    if (pop.style.display === "block" && !pop.contains(e.target) && e.target.id !== "tb-members" && !e.target.closest("#more-pop")) {
       pop.style.display = "none";
     }
   });
@@ -2468,7 +2484,7 @@ function bindRoom() {
     }
   });
 
-  /* 设置 */
+  /* 过滤 */
   // 明暗主题切换
   function initTheme() {
     if (localStorage.getItem("classroom-theme") === "dark") {
@@ -2489,18 +2505,13 @@ function bindRoom() {
   }
   function updateThemeIcon() {
     var icon = document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
-    ["btn-theme", "btn-theme-join"].forEach(function (id) {
-      var b = $(id);
-      if (b) b.textContent = icon;
-    });
+    var b = $("btn-theme");
+    if (b) b.textContent = icon;
   }
   $("btn-theme").onclick = toggleTheme;
-  var joinThemeBtn = $("btn-theme-join");
-  if (joinThemeBtn) joinThemeBtn.onclick = toggleTheme;
   initTheme();
   updateThemeIcon();
-  $("more-settings").onclick = function () {
-    $("more-pop").classList.remove("show");
+  $("btn-settings").onclick = function () {
     $("st-words").value = S.words;
     $("st-filter-on").checked = S.filterOn;
     $("settings-mask").classList.add("show");
@@ -2511,7 +2522,7 @@ function bindRoom() {
     S.filterOn = $("st-filter-on").checked;
     saveLS();
     $("settings-mask").classList.remove("show");
-    toast("设置已保存（仅本机生效）");
+    toast("过滤规则已保存（仅本机生效）");
   };
   $("settings-mask").addEventListener("click", function (e) {
     if (e.target === this) this.classList.remove("show");
