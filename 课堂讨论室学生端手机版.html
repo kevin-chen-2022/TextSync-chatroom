@@ -1147,8 +1147,18 @@ function toast(t) {
   clearTimeout(el._t);
   el._t = setTimeout(function () { el.classList.remove("show"); }, 1800);
 }
-/* 复制到系统剪贴板（clipboard API 优先，execCommand 兜底） */
+/* 复制到系统剪贴板：Capacitor 原生优先，其次 clipboard API，最后 execCommand 兜底 */
 function copyText(t) {
+  var capClip = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Clipboard)
+    ? window.Capacitor.Plugins.Clipboard
+    : (window.Plugins && window.Plugins.Clipboard ? window.Plugins.Clipboard : null);
+  if (capClip && typeof capClip.write === "function") {
+    capClip.write({ string: t }).then(
+      function () { toast("已复制到剪贴板"); },
+      function () { fallbackCopy(t); }
+    );
+    return;
+  }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(t).then(
       function () { toast("已复制到剪贴板"); },
@@ -1429,7 +1439,7 @@ function handleServerMsg(m) {
     }
   } else if (m.type === "ready") {
     if (m.data && Array.isArray(m.data.fileList)) syncFiles(m.data.fileList); // 房间现有文件（迟到者回放）
-    addSysMsg("已连接。注意：新加入看不到之前的消息，请看顶部公告");
+    addSysMsg("已连接。注意：新加入看不到之前的消息，请看顶部公告", "conn");
   } else if (m.type === "quit") {
     var qn = typeof m.data === "string" ? m.data : (m.data && m.data.name);
     if (qn && S.members[qn]) {
@@ -1804,10 +1814,16 @@ function initLightbox() {
     if (e.key === "Escape" && !$("lightbox").hidden) lbClose();
   });
 }
-function addSysMsg(text) {
+function addSysMsg(text, key) {
   var list = $("msg-list");
+  if (key) {
+    /* 同类通知只保留最新一条（如反复重连的「已连接」），避免把师生发言冲散 */
+    var olds = list.querySelectorAll('.sysmsg[data-key="' + key + '"]');
+    for (var i = 0; i < olds.length; i++) olds[i].parentNode.removeChild(olds[i]);
+  }
   var div = document.createElement("div");
   div.className = "sysmsg";
+  if (key) div.setAttribute("data-key", key);
   div.textContent = "— " + text + " —";
   list.appendChild(div);
   trimDom();
@@ -2033,7 +2049,7 @@ function doJoin() {
   renderMembers();
   /* 回放本机历史 */
   for (var i = 0; i < S.msgs.length; i++) renderMsg(S.msgs[i]);
-  addSysMsg("房间号 " + room + "，把页面发给同学即可加入");
+  addSysMsg("房间号 " + room + "，把页面发给同学即可加入", "room");
   connect();
 }
 
@@ -2063,6 +2079,33 @@ function bindRoom() {
       input.focus();
       input.setSelectionRange(st + t.length, st + t.length);
       updatePreview();
+    }
+    /* Capacitor 原生剪贴板：安卓 WebView 不支持 navigator.clipboard.read/readText，
+       若打包时安装了 @capacitor/clipboard，则走原生 ClipboardManager 读取。 */
+    var capClip = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Clipboard)
+      ? window.Capacitor.Plugins.Clipboard
+      : (window.Plugins && window.Plugins.Clipboard ? window.Plugins.Clipboard : null);
+    if (capClip && typeof capClip.read === "function") {
+      capClip.read().then(function (res) {
+        var type = (res.type || "").toLowerCase();
+        if (type.indexOf("image/") === 0) {
+          var ext = (type.split("/")[1] || "png").toLowerCase();
+          if (ext === "jpeg") ext = "jpg";
+          /* res.value 是纯 base64（不含 data: 前缀），转 File */
+          var raw = res.value || "";
+          var comma = raw.indexOf(",");
+          var b64 = comma >= 0 ? raw.slice(comma + 1) : raw;
+          try {
+            var byteStr = atob(b64);
+            var arr = new Uint8Array(byteStr.length);
+            for (var k = 0; k < byteStr.length; k++) arr[k] = byteStr.charCodeAt(k);
+            sendImage(new File([arr], "剪贴板图片." + ext, { type: type }));
+          } catch (e) { toast("图片解析失败"); }
+          return;
+        }
+        pasteText(res.value || "");
+      }).catch(function () { toast("读取剪贴板失败，请长按输入框选择粘贴"); });
+      return;
     }
     if (!navigator.clipboard) { toast("浏览器不支持一键粘贴，请用 Ctrl+V"); return; }
     if (navigator.clipboard.read) {          // Chrome/Edge：read() 可同时取图片与文本

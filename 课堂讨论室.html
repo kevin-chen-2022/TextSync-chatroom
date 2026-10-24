@@ -1227,7 +1227,7 @@ function handleServerMsg(m) {
     }
   } else if (m.type === "ready") {
     if (m.data && Array.isArray(m.data.fileList)) syncFiles(m.data.fileList); // 房间现有文件（迟到者回放）
-    addSysMsg("已连接。注意：新加入看不到之前的消息，请看顶部公告");
+    addSysMsg("已连接。注意：新加入看不到之前的消息，请看顶部公告", "conn");
   } else if (m.type === "quit") {
     var qn = typeof m.data === "string" ? m.data : (m.data && m.data.name);
     if (qn && S.members[qn]) {
@@ -1602,10 +1602,16 @@ function initLightbox() {
     if (e.key === "Escape" && !$("lightbox").hidden) lbClose();
   });
 }
-function addSysMsg(text) {
+function addSysMsg(text, key) {
   var list = $("msg-list");
+  if (key) {
+    /* 同类通知只保留最新一条（如反复重连的「已连接」），避免把师生发言冲散 */
+    var olds = list.querySelectorAll('.sysmsg[data-key="' + key + '"]');
+    for (var i = 0; i < olds.length; i++) olds[i].parentNode.removeChild(olds[i]);
+  }
   var div = document.createElement("div");
   div.className = "sysmsg";
+  if (key) div.setAttribute("data-key", key);
   div.textContent = "— " + text + " —";
   list.appendChild(div);
   trimDom();
@@ -1865,7 +1871,7 @@ function doJoin() {
   renderMembers();
   /* 回放本机历史 */
   for (var i = 0; i < S.msgs.length; i++) renderMsg(S.msgs[i]);
-  addSysMsg("房间号 " + room + "，把页面发给同学即可加入");
+  addSysMsg("房间号 " + room + "，把页面发给同学即可加入", "room");
   connect();
 }
 
