@@ -189,6 +189,57 @@
   .u-row.is-t { color: #b45309; font-weight: 700; }
   .u-row .u-tag { font-size: 11px; color: var(--muted); font-weight: 400; }
   .u-empty { padding: 12px; font-size: 12px; color: var(--muted); text-align: center; }
+
+  /* 名单屏蔽（本班成员白名单 + 禁言黑名单）：默认隐藏，点计数条展开后淡显 */
+  .msg.is-blocked { display: none; }
+  body.show-blocked .msg.is-blocked { display: flex; opacity: .45; }
+  #blocked-hint {
+    position: sticky; top: 0; z-index: 6; cursor: pointer; user-select: none;
+    text-align: center; font-size: 12px; padding: 4px 8px;
+    color: #b45309; background: #fffbeb; border-bottom: 1px solid #fde68a;
+  }
+
+  /* 过滤面板手风琴（本班成员 / 禁言名单 / 敏感词，互斥展开） */
+  .acc { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .acc-hd {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; font-size: 14px; font-weight: 700; background: #f8fafc; color: var(--ink);
+  }
+  .acc-hd .acc-arrow { font-size: 12px; color: var(--muted); transition: transform .15s; }
+  .acc-bd { display: none; padding: 10px 12px 12px; }
+  .acc.open .acc-bd { display: block; }
+  .acc.open .acc-arrow { transform: rotate(180deg); }
+  .acc-bd .settings-row { margin: 8px 0; }
+  .roster-bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  #btn-roster-import {
+    border: 1px solid var(--line); border-radius: 8px; background: #fff;
+    padding: 6px 10px; font-size: 13px; color: var(--ink);
+  }
+  #roster-count { font-size: 12px; color: var(--muted); }
+  .ban-add { position: relative; display: flex; gap: 8px; }
+  #ban-input {
+    flex: 1; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 10px; font-size: 13px; background: #fff; color: var(--ink);
+  }
+  #ban-input:focus { outline: none; border-color: var(--warn); }
+  #btn-ban-add {
+    flex: none; border-radius: 8px; background: #dc2626; color: #fff;
+    padding: 7px 14px; font-size: 13px; font-weight: 700;
+  }
+  #ban-sug {
+    display: none; position: absolute; left: 0; right: 62px; top: 100%; z-index: 5;
+    max-height: 160px; overflow-y: auto; background: #fff;
+    border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  }
+  #ban-sug.show { display: block; }
+  #ban-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ban-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px;
+    border-radius: 999px; background: #fef2f2; border: 1px solid #fecaca; font-size: 13px;
+  }
+  .ban-chip button { color: #dc2626; font-weight: 700; padding: 0 4px; font-size: 13px; }
+  .ban-empty { font-size: 12px; color: var(--muted); }
+  .msg-acts .ban-btn { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
   .srch-row { display: flex; gap: 8px; align-items: center; }
   #srch-input { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; background: #fff; }
   #srch-input:focus { outline: none; border-color: var(--warn); }
@@ -537,6 +588,15 @@
 [data-theme="dark"] .u-row:hover { background: #3f3f46; }
 [data-theme="dark"] .u-row.is-t { color: #fbbf24; }
 [data-theme="dark"] .u-empty { color: #9ca3af; }
+[data-theme="dark"] #blocked-hint { background: #292524; border-bottom-color: #44403c; color: #fbbf24; }
+[data-theme="dark"] .acc { border-color: #374151; }
+[data-theme="dark"] .acc-hd { background: #18181b; color: #f3f4f6; }
+[data-theme="dark"] #btn-roster-import { background: #27272a; border-color: #374151; color: #f3f4f6; }
+[data-theme="dark"] #ban-input { background: #18181b; border-color: #374151; color: #f3f4f6; }
+[data-theme="dark"] #ban-sug { background: #27272a; border-color: #374151; }
+[data-theme="dark"] .ban-chip { background: #450a0a; border-color: #7f1d1d; color: #fecaca; }
+[data-theme="dark"] .ban-chip button { color: #f87171; }
+[data-theme="dark"] .msg-acts .ban-btn { background: #450a0a; border-color: #7f1d1d; color: #f87171; }
 [data-theme="dark"] #srch-input { background: #18181b; border-color: #374151; color: #f3f4f6; }
 [data-theme="dark"] #srch-input:focus { border-color: #f59e0b; background: #27272a; }
 [data-theme="dark"] #srch-count,
@@ -760,7 +820,7 @@
 
   <!-- 消息流 -->
   <div id="msg-wrap">
-    <div id="msg-list"></div>
+    <div id="msg-list"><div id="blocked-hint" hidden></div></div>
     <button id="btn-top" type="button">↑</button>
     <button id="btn-bottom" type="button">↓</button>
     <div id="conn-tip">连接已断开，正在重连…</div>
@@ -832,12 +892,49 @@
 <div id="settings-mask">
   <div class="settings-card">
     <h3>过滤</h3>
-    <p class="settings-tip">敏感词（用逗号分隔）。发送时自动替换为 **，此列表仅保存在本机、只过滤自己的发言。已内置一份基础列表。</p>
-    <div class="settings-row">
-      <span>启用敏感词过滤</span>
-      <label class="switch"><input type="checkbox" id="st-filter-on"><em></em></label>
+
+    <div class="acc" id="acc-roster">
+      <button class="acc-hd" type="button"><span>本班成员</span><span class="acc-arrow">▼</span></button>
+      <div class="acc-bd">
+        <p class="settings-tip">启用后，名单外成员的发言将被折叠屏蔽（教师不受限）。姓名一行一个，保存后仅本机生效。</p>
+        <div class="settings-row">
+          <span>启用本班成员名单</span>
+          <label class="switch"><input type="checkbox" id="st-roster-on"><em></em></label>
+        </div>
+        <textarea id="st-roster" placeholder="一行一个姓名，例如：&#10;张三&#10;李四"></textarea>
+        <div class="roster-bar">
+          <button id="btn-roster-import" type="button">📂 导入 txt</button>
+          <span id="roster-count"></span>
+        </div>
+        <input type="file" id="roster-file" accept=".txt,text/plain" hidden>
+      </div>
     </div>
-    <textarea id="st-words" placeholder="例：词1，词2，词3"></textarea>
+
+    <div class="acc" id="acc-ban">
+      <button class="acc-hd" type="button"><span>禁言名单</span><span class="acc-arrow">▼</span></button>
+      <div class="acc-bd">
+        <p class="settings-tip">名单内成员的发言将被折叠屏蔽（教师不受限），仅本机生效。也可在发言的感应按钮中直接「禁言」。</p>
+        <div class="ban-add">
+          <input id="ban-input" type="text" placeholder="输入或选择成员姓名" autocomplete="off">
+          <button id="btn-ban-add" type="button">禁言</button>
+          <div id="ban-sug"></div>
+        </div>
+        <div id="ban-list"></div>
+      </div>
+    </div>
+
+    <div class="acc" id="acc-words">
+      <button class="acc-hd" type="button"><span>敏感词</span><span class="acc-arrow">▼</span></button>
+      <div class="acc-bd">
+        <p class="settings-tip">敏感词（用逗号分隔）。发送时自动替换为 **，此列表仅保存在本机、只过滤自己的发言。已内置一份基础列表。</p>
+        <div class="settings-row">
+          <span>启用敏感词过滤</span>
+          <label class="switch"><input type="checkbox" id="st-filter-on"><em></em></label>
+        </div>
+        <textarea id="st-words" placeholder="例：词1，词2，词3"></textarea>
+      </div>
+    </div>
+
     <div class="st-actions">
       <button id="st-cancel" type="button">取消</button>
       <button id="st-save" type="button">保存</button>
@@ -932,7 +1029,10 @@ var S = {
   filter: "",          // 分类筛选："" 全部 | "qa" 问答 | "file" 文件 | "img" 图片
   filterUser: "",      // 成员筛选："" 不限 | 成员名
   filterOn: true,
-  words: DEFAULT_WORDS
+  words: DEFAULT_WORDS,
+  roster: [],          // 本班成员白名单（显示名，不带教师前缀）
+  rosterOn: false,     // 是否启用本班成员白名单
+  banList: []          // 禁言名单（显示名，不带教师前缀）
 };
 
 var $ = function (id) { return document.getElementById(id); };
@@ -1157,6 +1257,11 @@ function loadLS() {
     var w = localStorage.getItem("cr_words");
     if (w !== null) S.words = w;
     S.filterOn = localStorage.getItem("cr_filter") !== "0";
+    var r = localStorage.getItem("cr_roster");
+    if (r) S.roster = JSON.parse(r) || [];
+    S.rosterOn = localStorage.getItem("cr_roster_on") === "1";
+    var b = localStorage.getItem("cr_ban");
+    if (b) S.banList = JSON.parse(b) || [];
   } catch (e) {}
 }
 function saveLS() {
@@ -1164,6 +1269,9 @@ function saveLS() {
     localStorage.setItem("cr_font", String(S.fontSize));
     localStorage.setItem("cr_words", S.words);
     localStorage.setItem("cr_filter", S.filterOn ? "1" : "0");
+    localStorage.setItem("cr_roster", JSON.stringify(S.roster));
+    localStorage.setItem("cr_roster_on", S.rosterOn ? "1" : "0");
+    localStorage.setItem("cr_ban", JSON.stringify(S.banList));
   } catch (e) {}
 }
 /* 敏感词过滤（只作用于发送内容） */
@@ -1253,7 +1361,11 @@ function handleServerMsg(m) {
     if (m.data && !S.members[m.data]) {
       S.members[m.data] = true;
       renderMembers();
-      if (m.data !== S.name) addSysMsg(displayName(m.data) + (isTeacherName(m.data) ? "（老师）" : "") + " 加入了讨论");
+      if (m.data !== S.name) {
+        var jtag = (S.rosterOn && S.roster.length && !isTeacherName(m.data) &&
+                    S.roster.indexOf(displayName(m.data)) < 0) ? "（不在本班名单）" : "";
+        addSysMsg(displayName(m.data) + (isTeacherName(m.data) ? "（老师）" : "") + " 加入了讨论" + jtag);
+      }
       maybeReplayNotice(m.data);
       maybeReplayFiles(m.data);
     }
@@ -1431,6 +1543,7 @@ function renderMsg(msg) {
                   (mine ? " mine" : "") + (msg.type === "question" ? " is-q" : "") +
                   (msg.type === "answer" ? " is-a" : "");
   div.setAttribute("data-name", msg.name);
+  if (isBlockedName(msg.name)) div.classList.add("is-blocked");
   if ((msg.type === "file" || msg.type === "image") && msg.file) div.setAttribute("data-fid", msg.file.id);
   var initial = displayName(msg.name).slice(0, 1) || "?";
   var icoSvg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
@@ -1458,6 +1571,7 @@ function renderMsg(msg) {
         '<button class="pin-btn" type="button">上屏</button>' +
         '<button class="copy-btn" type="button">复制</button>' +
         '<button class="fwd-btn" type="button">发送</button>' +
+        (isT ? "" : '<button class="ban-btn" type="button">禁言</button>') +
       "</span>");
   div.innerHTML = html;
 
@@ -1480,6 +1594,8 @@ function renderMsg(msg) {
       updatePreview();
       toast("已放入编辑框，可修改后发送");
     };
+    var banBtn = acts.querySelector(".ban-btn");
+    if (banBtn) banBtn.onclick = function () { addBanName(msg.name); };
   }
   /* 点击消息气泡切换显示操作按钮（触屏无 hover） */
   div.addEventListener("click", function () {
@@ -1492,6 +1608,7 @@ function renderMsg(msg) {
 
   list.appendChild(div);
   trimDom();
+  updateBlockedHint();
   if (S.searchQ || S.filter) applyOnlyQFilter();   // 筛选/搜索激活时新消息立即参与过滤
   autoScroll();
 }
@@ -1652,7 +1769,22 @@ function addSysMsg(text, key) {
 }
 function trimDom() {
   var list = $("msg-list");
-  while (list.children.length > MAX_KEEP + 40) list.removeChild(list.firstChild);
+  /* 首子元素是 #blocked-hint 粘性计数条，裁剪时跳过 */
+  while (list.children.length > MAX_KEEP + 40) {
+    var first = list.firstChild;
+    if (first && first.id === "blocked-hint") list.removeChild(list.children[1]);
+    else list.removeChild(first);
+  }
+}
+/* 清空消息流但保留 #blocked-hint 计数条 */
+function clearMsgDom() {
+  var list = $("msg-list");
+  var kids = list.children;
+  for (var i = kids.length - 1; i >= 0; i--) {
+    if (kids[i].id !== "blocked-hint") list.removeChild(kids[i]);
+  }
+  document.body.classList.remove("show-blocked");
+  updateBlockedHint();
 }
 function autoScroll() {
   var list = $("msg-list");
@@ -1695,6 +1827,112 @@ function applyOnlyQFilter() {
   if (kws.length) parts.push("匹配 " + n + " 条");
   if (cnt) cnt.textContent = parts.join("，");
   highlightMatches(kws);
+}
+
+/* ---------- 名单屏蔽（本班成员白名单 + 禁言名单，仅教师端本机生效） ---------- */
+/* 判定某发送者的发言是否被屏蔽；教师永不屏蔽 */
+function isBlockedName(name) {
+  if (isTeacherName(name)) return false;
+  var dn = displayName(name);
+  if (S.banList.indexOf(dn) >= 0) return true;
+  if (S.rosterOn && S.roster.length && S.roster.indexOf(dn) < 0) return true;
+  return false;
+}
+/* 文本 → 姓名数组：按行/逗号/顿号/分号/空白切分，去空去重 */
+function parseNames(text) {
+  var parts = String(text || "").split(/[\r\n,，、;；\s]+/);
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var n = parts[i].trim();
+    if (n && out.indexOf(n) < 0) out.push(n);
+  }
+  return out;
+}
+/* 读本地 txt：按 BOM / 乱码回退判 UTF-8 或 GBK，回调拿到文本 */
+function readTextFile(file, cb) {
+  var fr = new FileReader();
+  fr.onload = function () {
+    var buf = fr.result;
+    var u8 = new Uint8Array(buf);
+    var text;
+    if (u8.length >= 3 && u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) {
+      text = new TextDecoder("utf-8").decode(u8.subarray(3));
+    } else {
+      text = new TextDecoder("utf-8").decode(u8);
+      if (text.indexOf("") >= 0) {
+        try { text = new TextDecoder("gbk").decode(u8); } catch (e) {}
+      }
+    }
+    cb(text);
+  };
+  fr.onerror = function () { toast("读取文件失败"); };
+  fr.readAsArrayBuffer(file);
+}
+/* 屏蔽计数条：有屏蔽时显示并可点击展开/收起淡显 */
+function updateBlockedHint() {
+  var hint = $("blocked-hint");
+  if (!hint) return;
+  var n = $("msg-list").querySelectorAll(".msg.is-blocked").length;
+  if (n > 0) {
+    hint.hidden = false;
+    hint.textContent = "已屏蔽 " + n + " 条发言（点击" +
+      (document.body.classList.contains("show-blocked") ? "收起" : "展开查看") + "）";
+  } else {
+    hint.hidden = true;
+    document.body.classList.remove("show-blocked");
+  }
+}
+/* 名单变化后重判所有已渲染消息 */
+function reclassifyBlocked() {
+  var items = $("msg-list").querySelectorAll(".msg[data-name]");
+  for (var i = 0; i < items.length; i++) {
+    var dn = items[i].getAttribute("data-name");
+    items[i].classList.toggle("is-blocked", isBlockedName(dn));
+  }
+  renderMembers();
+  updateBlockedHint();
+}
+/* 禁言 chips 渲染（过滤面板内） */
+function renderBanChips() {
+  var box = $("ban-list");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!S.banList.length) {
+    box.innerHTML = '<span class="ban-empty">暂无禁言成员</span>';
+    return;
+  }
+  for (var i = 0; i < S.banList.length; i++) {
+    var chip = document.createElement("span");
+    chip.className = "ban-chip";
+    chip.appendChild(document.createTextNode(S.banList[i]));
+    var x = document.createElement("button");
+    x.type = "button";
+    x.textContent = "✕";
+    x.title = "解除禁言";
+    x.setAttribute("data-name", S.banList[i]);
+    x.onclick = function () { removeBanName(this.getAttribute("data-name")); };
+    chip.appendChild(x);
+    box.appendChild(chip);
+  }
+}
+function addBanName(name) {
+  name = displayName(String(name || "").trim());
+  if (!name) return;
+  if (S.banList.indexOf(name) >= 0) { toast("「" + name + "」已在禁言名单"); return; }
+  S.banList.push(name);
+  saveLS();
+  renderBanChips();
+  reclassifyBlocked();
+  toast("已将「" + name + "」加入禁言名单");
+}
+function removeBanName(name) {
+  var i = S.banList.indexOf(name);
+  if (i < 0) return;
+  S.banList.splice(i, 1);
+  saveLS();
+  renderBanChips();
+  reclassifyBlocked();
+  toast("已解除「" + name + "」的禁言");
 }
 /* 搜索高亮：只处理文本节点（TreeWalker），不碰标签结构，无注入风险 */
 function findMarks(low, kws) {
@@ -1817,7 +2055,8 @@ function renderMembers() {
     var row = document.createElement("div");
     row.className = "mrow" + (isTeacherName(names[i]) ? " is-t" : "");
     row.textContent = displayName(names[i]) + (isTeacherName(names[i]) ? "（老师）" : "") +
-                      (names[i] === S.name ? "（我）" : "");
+                      (names[i] === S.name ? "（我）" : "") +
+                      (S.banList.indexOf(displayName(names[i])) >= 0 ? " 🚫" : "");
     box.appendChild(row);
   }
   /* 成员离线时自动清除成员筛选，避免筛空 */
@@ -2216,7 +2455,7 @@ function bindRoom() {
     if (!confirm("清屏只清空本机显示和本机记录，其他同学不受影响。确定清屏？")) return;
     S.msgs = [];
     saveHistory();
-    $("msg-list").innerHTML = "";
+    clearMsgDom();
     addSysMsg("屏幕已清空");
   };
 
@@ -2291,19 +2530,109 @@ function bindRoom() {
   $("btn-settings").onclick = function () {
     $("st-words").value = S.words;
     $("st-filter-on").checked = S.filterOn;
+    $("st-roster").value = S.roster.join("\n");
+    $("st-roster-on").checked = S.rosterOn;
+    updateRosterCount();
+    renderBanChips();
+    $("ban-input").value = "";
+    hideBanSug();
     $("settings-mask").classList.add("show");
   };
   $("st-cancel").onclick = function () { $("settings-mask").classList.remove("show"); };
   $("st-save").onclick = function () {
     S.words = $("st-words").value.trim();
     S.filterOn = $("st-filter-on").checked;
+    S.roster = parseNames($("st-roster").value);
+    S.rosterOn = $("st-roster-on").checked;
     saveLS();
+    reclassifyBlocked();
     $("settings-mask").classList.remove("show");
     toast("过滤规则已保存（仅本机生效）");
   };
   $("settings-mask").addEventListener("click", function (e) {
     if (e.target === this) this.classList.remove("show");
   });
+
+  /* 手风琴互斥：展开一个区块时收起其他 */
+  var accs = document.querySelectorAll("#settings-mask .acc");
+  for (var ai = 0; ai < accs.length; ai++) {
+    accs[ai].querySelector(".acc-hd").onclick = function () {
+      var cur = this.parentNode;
+      var willOpen = !cur.classList.contains("open");
+      for (var aj = 0; aj < accs.length; aj++) accs[aj].classList.remove("open");
+      if (willOpen) cur.classList.add("open");
+    };
+  }
+
+  /* 本班成员：实时人数统计 + txt 导入（UTF-8/GBK 自适应，合并去重待保存） */
+  function updateRosterCount() {
+    var n = parseNames($("st-roster").value).length;
+    $("roster-count").textContent = n ? ("共 " + n + " 人") : "";
+  }
+  $("st-roster").addEventListener("input", updateRosterCount);
+  $("btn-roster-import").onclick = function () { $("roster-file").click(); };
+  $("roster-file").onchange = function () {
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (!f) return;
+    readTextFile(f, function (text) {
+      var merged = parseNames($("st-roster").value + "\n" + text);
+      var added = merged.length - parseNames($("st-roster").value).length;
+      $("st-roster").value = merged.join("\n");
+      updateRosterCount();
+      toast("已导入 " + (added > 0 ? added : 0) + " 个姓名，请确认后保存");
+    });
+  };
+
+  /* 禁言名单：输入联想在线成员（教师除外），回车/按钮添加 */
+  function hideBanSug() { $("ban-sug").classList.remove("show"); $("ban-sug").innerHTML = ""; }
+  $("ban-input").addEventListener("input", function () {
+    var q = this.value.trim().toLowerCase();
+    var sug = $("ban-sug");
+    sug.innerHTML = "";
+    if (!q) { hideBanSug(); return; }
+    var hits = [];
+    var names = Object.keys(S.members);
+    for (var i = 0; i < names.length; i++) {
+      if (isTeacherName(names[i])) continue;
+      var dn = displayName(names[i]);
+      if (dn.toLowerCase().indexOf(q) >= 0 && S.banList.indexOf(dn) < 0) hits.push(dn);
+    }
+    if (!hits.length) { hideBanSug(); return; }
+    for (var j = 0; j < hits.length; j++) {
+      var row = document.createElement("div");
+      row.className = "u-row";
+      row.textContent = hits[j];
+      row.setAttribute("data-name", hits[j]);
+      row.onmousedown = function (e) {   // mousedown 先于 blur，保证点击生效
+        e.preventDefault();
+        addBanName(this.getAttribute("data-name"));
+        $("ban-input").value = "";
+        hideBanSug();
+      };
+      sug.appendChild(row);
+    }
+    sug.classList.add("show");
+  });
+  $("ban-input").addEventListener("blur", hideBanSug);
+  $("ban-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      addBanName(this.value);
+      this.value = "";
+      hideBanSug();
+    }
+  });
+  $("btn-ban-add").onclick = function () {
+    addBanName($("ban-input").value);
+    $("ban-input").value = "";
+    hideBanSug();
+  };
+
+  /* 屏蔽计数条：点击展开/收起被屏蔽发言 */
+  $("blocked-hint").onclick = function () {
+    document.body.classList.toggle("show-blocked");
+    updateBlockedHint();
+  };
 }
 function setFont(px) {
   S.fontSize = Math.max(14, Math.min(30, px));
