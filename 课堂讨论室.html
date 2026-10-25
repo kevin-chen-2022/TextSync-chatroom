@@ -2512,7 +2512,7 @@ function bindRoom() {
     } else {                                            // 手动滚离底部 → 显示回底按钮
       $("btn-bottom").classList.add("show");
     }
-    if (this.scrollTop > this.clientHeight) {           // 距顶部超过一屏 → 显示回顶按钮
+    if (this.scrollTop > 120) {                           // 离开顶部 → 显示回顶按钮
       $("btn-top").classList.add("show");
     } else {
       $("btn-top").classList.remove("show");
@@ -2698,7 +2698,7 @@ function sendMsg() {
   S.lastSend = now;
   /* 本机立即回显；服务器实际会把消息回传给发送者，pushMsg 按 同名+同毫秒+同内容 去重防双条 */
   pushMsg({
-    name: S.name, text: text, time: now, color: S.msgColor,
+    name: S.name, text: payload.replace(MARK_Q, "").replace(MARK_H, ""), time: now, color: S.msgColor,
     type: S.msgType === "question" ? "question" : (S.msgType === "answer" ? "answer" : "normal")
   });
   input.value = "";
