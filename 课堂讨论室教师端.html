@@ -781,12 +781,13 @@
       <button class="fs-btn" id="fs-plus" type="button">A+</button>
       <button class="fs-btn" id="fs-reset" type="button">重置</button>
     </div>
-    <button class="tb-btn" id="btn-filter" type="button" title="分类查看（问答/文件/图片）与关键词搜索">筛选</button>
     <button class="tb-btn" id="btn-settings" type="button" title="过滤敏感词">过滤</button>
+    <button class="tb-btn" id="btn-filter" type="button" title="分类查看（问答/文件/图片）与关键词搜索">筛选</button>
     <button class="tb-btn" id="btn-export" type="button">导出</button>
     <button class="tb-btn" id="btn-clear" type="button">清屏</button>
     <button class="tb-btn" id="btn-theme" type="button" title="切换明暗主题">🌙</button>
     <button class="tb-btn" id="btn-about" type="button" title="关于本工具">关于</button>
+    <button class="tb-btn" id="btn-leave" type="button" title="退出当前房间">退出</button>
   </div>
 
   <!-- 教师公告（置顶显示，不随消息滚动；无公告时整条隐藏） -->
@@ -2466,6 +2467,25 @@ function bindRoom() {
     saveHistory();
     clearMsgDom();
     addSysMsg("屏幕已清空");
+  };
+
+  /* 退出房间：主动断开连接并回到进房页（与手机版一致） */
+  $("btn-leave").onclick = function () {
+    if (!confirm("确定退出当前房间吗？")) return;
+    S.closedByUser = true;
+    if (S.retryTimer) { clearTimeout(S.retryTimer); S.retryTimer = null; }
+    if (S.ws) { S.ws.close(); S.ws = null; }
+    S.wsOk = false;
+    $("view-room").style.display = "none";
+    $("view-join").style.display = "flex";
+    S.members = {}; S.msgs = []; S.notice = ""; S.selfJoined = false;
+    clearMsgDom();
+    $("member-list").innerHTML = "";
+    $("notice-text").innerHTML = "";
+    document.body.classList.remove("is-teacher");
+    document.body.classList.remove("show-blocked");
+    updateBlockedHint();
+    updateDot();
   };
 
   /* 成员浮层 */
