@@ -1026,6 +1026,7 @@ var S = {
   room: "", name: "", isTeacher: false,
   ws: null, wsOk: false, retry: 0, retryTimer: null, closedByUser: false,
   members: {},                      // 名单（joined 加入，quit 移除）
+  selfJoined: false,                // 是否已收到自己的进房回显（用于同名检测）
   msgs: [],                         // 本机历史 {name, text, time, type}
   notice: "",                       // 当前公告内容（本机缓存）
   fileCache: {},                    // 房间文件缓存 id → {id,name,size,uid,username}（教师重发用）
@@ -1368,13 +1369,20 @@ function safeSend(obj) {
 /* ---------- 服务器消息分发 ---------- */
 function handleServerMsg(m) {
   if (m.type === "joined") {
+    /* 同名检测：自己的进房回显只算一次，此后同名再加入视为另有同名成员（多端同名属正常场景，仅轻提示） */
+    if (m.data && m.data === S.name) {
+      if (S.selfJoined) addSysMsg("检测到有与你同名的成员加入，如非本人多端在线，建议改名区分（名单/筛选按姓名匹配）", "dupself");
+      S.selfJoined = true;
+    } else if (m.data && displayName(m.data) === displayName(S.name)) {
+      addSysMsg("检测到有与你同名的成员加入，如非本人多端在线，建议改名区分（名单/筛选按姓名匹配）", "dupself");
+    }
     if (m.data && !S.members[m.data]) {
       S.members[m.data] = true;
       renderMembers();
       if (m.data !== S.name) {
         var jtag = (S.isTeacher && S.rosterOn && S.roster.length && !isTeacherName(m.data) &&
                     S.roster.indexOf(displayName(m.data)) < 0) ? "（不在本班名单）" : "";
-        addSysMsg(displayName(m.data) + (isTeacherName(m.data) ? "（老师）" : "") + " 加入了讨论" + jtag);
+        addSysMsg(displayName(m.data) + (isTeacherName(m.data) ? "（老师）" : "") + " 加入了讨论" + jtag, "io:" + m.data);
       }
       maybeReplayNotice(m.data);
       maybeReplayFiles(m.data);
@@ -1387,7 +1395,7 @@ function handleServerMsg(m) {
     if (qn && S.members[qn]) {
       delete S.members[qn];
       renderMembers();
-      addSysMsg(displayName(qn) + (isTeacherName(qn) ? "（老师）" : "") + " 离开了讨论");
+      addSysMsg(displayName(qn) + (isTeacherName(qn) ? "（老师）" : "") + " 离开了讨论", "io:" + qn);
     }
   } else if (m.type === "message") {
     if (!m.data || typeof m.data.message !== "string") return;
@@ -2162,6 +2170,7 @@ function doJoin() {
   }
   renderNotice(false);
   S.members = {};
+  S.selfJoined = false;
   S.members[S.name] = true;
   renderMembers();
   /* 回放本机历史 */
