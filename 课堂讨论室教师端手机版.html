@@ -641,15 +641,18 @@
   #srch-input { min-width: 0; padding: 8px 10px; font-size: 14px; }
   #srch-close { padding: 10px 6px; }
 
-  /* 消息流 */
+  /* 消息流（B 方案：手机端全部左对齐，气泡占满可用宽度） */
   #msg-list { padding: 10px 10px 18px; }
   .msg { gap: 6px; margin-bottom: 10px; }
+  .msg.mine { flex-direction: row; }            /* 解除 row-reverse，全部左对齐 */
   .avatar { width: 30px; height: 30px; font-size: 13px; }
-  .bubble-col { max-width: 72%; }
-  .bubble { padding: 8px 11px; font-size: var(--msg-size); border-radius: 4px 12px 12px 12px; }
-  .msg.mine .bubble { border-radius: 12px 4px 12px 12px; }
-  .meta { font-size: 11px; }
-  .img-bubble { padding: 5px; max-width: min(240px, 100%); }
+  .bubble-col { max-width: 100%; }              /* 气泡占满头像旁剩余空间（≈屏宽 92%） */
+  .msg.mine .bubble-col { align-items: flex-start; } /* 解除右对齐 */
+  .bubble { padding: 8px 11px; font-size: var(--msg-size); border-radius: 10px; }
+  .msg.mine .bubble { border-radius: 10px; }    /* 统一圆角，无右侧尖角 */
+  .meta { font-size: 11px; margin: 0 0 3px; }
+  .img-bubble { padding: 5px; max-width: min(240px, 100%); border-radius: 10px; }
+  .msg.mine .img-bubble { border-radius: 10px; }
   .img-bubble img { max-height: 220px; }
   #btn-top, #btn-bottom { width: 44px; height: 44px; right: 12px; font-size: 19px; }
   #btn-bottom { bottom: 14px; }
