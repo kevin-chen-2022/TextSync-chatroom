@@ -1030,6 +1030,7 @@ var S = {
   selfJoined: false,                // 是否已收到自己的进房回显（用于同名检测）
   msgs: [],                         // 本机历史 {name, text, time, type}
   notice: "",                       // 当前公告内容（本机缓存）
+  noticeTime: 0,                    // 已接受公告的时间戳（仅接受更新的，防旧公告覆盖新公告）
   fileCache: {},                    // 房间文件缓存 id → {id,name,size,uid,username}（教师重发用）
   replayedTo: {},                   // 公告重发记录（每次进房重置）
   fileReplayedTo: {},               // 文件列表重发记录
@@ -1307,6 +1308,8 @@ function loadHistory() {
     }
     var n = localStorage.getItem("cr_notice_" + S.room);
     if (n) S.notice = n;
+    var nt = parseFloat(localStorage.getItem("cr_notice_time_" + S.room));
+    if (nt && nt > 0) S.noticeTime = nt;
   } catch (e) { S.msgs = []; }
 }
 function saveHistory() {
@@ -1314,6 +1317,7 @@ function saveHistory() {
     if (S.msgs.length > MAX_KEEP) S.msgs = S.msgs.slice(-MAX_KEEP);
     localStorage.setItem("cr_msg_" + S.room, JSON.stringify(S.msgs));
     localStorage.setItem("cr_notice_" + S.room, S.notice || "");
+    localStorage.setItem("cr_notice_time_" + S.room, String(S.noticeTime || 0));
   } catch (e) {}
 }
 
@@ -1418,9 +1422,10 @@ function handleServerMsg(m) {
       if (nstash.length) t2 = t2.replace(/\u0001(\d+)\u0001/g, function (_, i) { return nstash[+i]; });
       var fresh = t2;                           // 公告保留行内包裹标记，渲染时转富文本
       if (!stripMark(fresh).trim()) fresh = ""; // 实际内容为空视为撤下
+      /* 时间戳守卫：只接受比本机已接受的更新的公告，防旧公告覆盖新公告（多端教师竞态） */
+      if (time < S.noticeTime) return;
       var changed = fresh !== S.notice || nc !== (S.noticeColor || "");
-      S.notice = fresh;
-      S.noticeColor = nc;
+      S.notice = fresh; S.noticeColor = nc; S.noticeTime = time;
       renderNotice(changed);                    // 内容相同（如教师重发）不重复弹提示
       return;
     }
@@ -2017,11 +2022,14 @@ function highlightMatches(kws) {
 function maybeReplayNotice(name) {
   if (!S.isTeacher || !S.notice) return;
   if (S.replayedTo[name]) return;
+  if (name === S.name) return;        /* 不给自己重发：自己重进房已在 sendMsg 路径更新过 noticeTime */
   S.replayedTo[name] = true;
   setTimeout(function () {
     if (S.ws && S.ws.readyState === 1) {
       var npre = S.noticeColor ? ("\u200bC" + S.noticeColor + "\u200b") : "";
-      safeSend({ type: "message", data: { message: MARK_A + npre + S.notice, time: Date.now() } });
+      var now = Date.now();
+      S.noticeTime = now;
+      safeSend({ type: "message", data: { message: MARK_A + npre + S.notice, time: now } });
     }
   }, 1000);
 }
@@ -2059,7 +2067,9 @@ function renderNotice(alsoToast) {
 function pinToScreen(name, text) {
   var content = "【上屏】" + name + "：" + stripMark(text);
   if (content.length > 280) content = content.slice(0, 280) + "…";
-  if (safeSend({ type: "message", data: { message: MARK_A + content, time: Date.now() } })) {
+  var now = Date.now();
+  S.noticeTime = now;
+  if (safeSend({ type: "message", data: { message: MARK_A + content, time: now } })) {
     toast("已上屏到公告区");
   }
 }
@@ -2501,7 +2511,7 @@ function bindRoom() {
     S.wsOk = false;
     $("view-room").style.display = "none";
     $("view-join").style.display = "flex";
-    S.members = {}; S.msgs = []; S.notice = ""; S.selfJoined = false;
+    S.members = {}; S.msgs = []; S.notice = ""; S.noticeTime = 0; S.selfJoined = false;
     clearMsgDom();
     $("member-list").innerHTML = "";
     $("notice-text").innerHTML = "";
@@ -2698,7 +2708,9 @@ function publishNotice() {
   if (!t) { toast("公告内容不能为空"); return; }
   if (t.length > 200) { toast("公告最多 200 字"); return; }
   var npre = S.noticeColor ? ("\u200bC" + S.noticeColor + "\u200b") : "";
-  if (!safeSend({ type: "message", data: { message: MARK_A + npre + t, time: Date.now() } })) return;
+  var now = Date.now();
+  S.noticeTime = now;
+  if (!safeSend({ type: "message", data: { message: MARK_A + npre + t, time: now } })) return;
   S.notice = t;
   NOTICE_DRAFT = "";
   input.value = "";
